@@ -1,0 +1,14 @@
+key: dcf78897f81d1939ffe29a23a845293a5d704250
+created_at: 2025-10-27T01:33:05.009385Z
+compiler_version: 0.1.0
+llvm_version: '15.0'
+source: /Users/jonathan/Downloads/otterlang/examples/hello.otter
+imports: []
+binary_path: .otter_cache/binaries/dcf78897f81d1939ffe29a23a845293a5d704250
+binary_size: 33464
+build_time_ms: 36
+options:
+  release: false
+  lto: false
+  emit_ir: false
+linked_crates: []

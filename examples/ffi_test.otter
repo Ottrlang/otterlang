@@ -1,0 +1,2 @@
+fn main:
+    print("FFI demo placeholder - integrate add(5, 7) once call support lands")

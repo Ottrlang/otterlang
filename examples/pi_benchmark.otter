@@ -1,0 +1,19 @@
+use otter:math
+use otter:time
+
+fn leibniz_pi(iterations: int) -> float:
+    pi = 0.0
+    sign = 1.0
+    for n in 0..iterations:
+        pi += sign / (2.0 * n + 1.0)
+        sign = -sign
+    return 4.0 * pi
+
+fn main:
+    print("🦦 Starting π benchmark…")
+    start = time.now()
+    iterations = 50_000_000
+    result = leibniz_pi(iterations)
+    duration = time.now() - start
+    print(f"π ≈ {result}")
+    print(f"Time: {duration} ms for {iterations} iterations")
