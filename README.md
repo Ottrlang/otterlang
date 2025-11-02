@@ -9,6 +9,10 @@
     <strong>Simple like Python, fast with Rust, and everything in between.</strong>
 </p>
 
+[![Build Status](https://github.com/jonathanmagambo/otterlang/workflows/CI/badge.svg)](https://github.com/jonathanmagambo/otterlang/actions)
+
+[![Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2?style=flat&logo=discord&logoColor=white)](https://discord.gg/y3b4QuvyFk)
+
 An experimental indentation-sensitive programming language with an LLVM backend. OtterLang compiles to native binaries with a focus on simplicity and performance.
 
 ## Performance Benchmarks
@@ -199,6 +203,10 @@ fn main:
 
 ### FFI (Foreign Function Interface)
 
+OtterLang supports importing Rust crates through a Foreign Function Interface system. This allows you to use existing Rust libraries in your OtterLang programs.
+
+#### Using FFI
+
 Import Rust crates using the `rust:` namespace:
 
 ```otter
@@ -208,6 +216,55 @@ fn main:
     # Use serde_json functions
     pass
 ```
+
+#### How FFI Works
+
+1. **Bridge Configuration**: Each Rust crate requires a `bridge.yaml` file in `ffi/<crate-name>/` that defines how to call Rust functions
+2. **Automatic Compilation**: When you `use rust:crate`, OtterLang automatically:
+   - Downloads the Rust crate via Cargo (if not already present)
+   - Generates FFI bindings
+   - Compiles the bridge library
+   - Makes functions available to your OtterLang code
+3. **Function Calling**: FFI functions are called just like regular OtterLang functions
+
+#### Available FFI Bridges
+
+OtterLang includes bridges for several popular Rust crates:
+
+- `serde_json` - JSON serialization/deserialization
+- `rand` - Random number generation
+- `chrono` - Date and time handling
+- `reqwest` - HTTP client
+- `rusqlite` - SQLite database driver
+- `postgres` - PostgreSQL database driver
+- `rayon` - Parallel data processing
+- `nalgebra` - Linear algebra library
+- `libm` - Mathematical functions
+
+#### Creating Custom FFI Bridges
+
+To add support for a new Rust crate:
+
+1. Create `ffi/<crate-name>/bridge.yaml`
+2. Define function signatures and call expressions
+3. See existing bridges in `ffi/` for examples
+
+Example bridge.yaml structure:
+```yaml
+dependency:
+  name: "crate_name"
+  version: "1.0"
+functions:
+  - name: "function_name"
+    params: ["F64", "Str"]
+    result: "F64"
+    doc: "Function description"
+    call:
+      kind: expr
+      expr: "crate_name::function({0}, {1})"
+```
+
+See [docs/DATABASE.md](docs/DATABASE.md) for examples of using database drivers via FFI.
 
 ## Examples
 

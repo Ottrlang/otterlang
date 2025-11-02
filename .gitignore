@@ -29,6 +29,8 @@ Cargo.lock
 *.tmp
 *.log
 *.orig
+*.bak
+*.backup
 
 # Coverage reports
 tarpaulin-report.html
@@ -37,10 +39,14 @@ coverage/
 # Environment files
 .env
 .env.local
+.env.*.local
+*.env
 
 # Release artifacts (keep the workflow, but ignore generated files)
 release/
 
 # FFI bridge build artifacts
 ffi/*/target/
+**/Cargo.lock
+# Note: We ignore Cargo.lock for binary crates, but you may want to include it for reproducibility
 
