@@ -199,7 +199,7 @@ pub fn build_executable(
         let after_darwin = &native_str[darwin_idx + 6..];
         if after_darwin.chars().next().map_or(false, |c| c.is_ascii_digit() || c == '.') {
             // Version suffix found after "darwin", strip it
-            format!("{}darwin", &native_str[..darwin_idx + 6])
+            format!("arm64-apple-darwin")  // Use standard format for macOS ARM
         } else {
             native_str.clone()
         }
@@ -389,7 +389,7 @@ pub fn build_shared_library(
         let after_darwin = &native_str[darwin_idx + 6..];
         if after_darwin.chars().next().map_or(false, |c| c.is_ascii_digit() || c == '.') {
             // Version suffix found after "darwin", strip it
-            format!("{}darwin", &native_str[..darwin_idx + 6])
+            format!("arm64-apple-darwin")  // Use standard format for macOS ARM
         } else {
             native_str.clone()
         }
