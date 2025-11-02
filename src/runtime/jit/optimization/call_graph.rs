@@ -1,4 +1,4 @@
-use crate::ast::nodes::{Function, Block, Expr, Statement};
+use crate::ast::nodes::{Block, Expr, Function, Statement};
 
 /// Builds call graph for optimization
 pub struct CallGraph {
@@ -38,7 +38,12 @@ impl CallGraph {
                     callees.push(name.clone());
                 }
             }
-            Statement::If { then_block, elif_blocks, else_block, .. } => {
+            Statement::If {
+                then_block,
+                elif_blocks,
+                else_block,
+                ..
+            } => {
                 self.extract_callees_from_block(then_block, callees);
                 for (_, block) in elif_blocks {
                     self.extract_callees_from_block(block, callees);
@@ -77,4 +82,3 @@ impl Default for CallGraph {
         Self::new()
     }
 }
-

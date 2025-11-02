@@ -1,7 +1,7 @@
-use std::hash::{Hash, Hasher};
 use ahash::AHasher;
+use std::hash::{Hash, Hasher};
 
-use super::{RuntimeType, RuntimeConstant};
+use super::{RuntimeConstant, RuntimeType};
 
 /// Unique key identifying a specialized function version
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -48,7 +48,9 @@ impl SpecializationKey {
             .map(|t| format!("{:?}", t))
             .collect::<Vec<_>>()
             .join(",");
-        format!("{}_<{}>_{:x}", self.function_name, types_str, self.arg_constants_hash)
+        format!(
+            "{}_<{}>_{:x}",
+            self.function_name, types_str, self.arg_constants_hash
+        )
     }
 }
-

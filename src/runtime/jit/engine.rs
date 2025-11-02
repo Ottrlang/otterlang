@@ -4,23 +4,30 @@ use inkwell::context::Context as LlvmContext;
 use crate::ast::nodes::Program;
 use crate::runtime::symbol_registry::SymbolRegistry;
 
+use super::adaptive::{AdaptiveConcurrencyManager, AdaptiveMemoryManager};
+use super::cache::FunctionCache;
+use super::optimization::{CallGraph, Inliner, Reoptimizer};
 use super::profiler::GlobalProfiler;
 use super::specialization::{Specializer, TypeTracker};
-use super::cache::FunctionCache;
-use super::optimization::{Inliner, Reoptimizer, CallGraph};
-use super::adaptive::{AdaptiveMemoryManager, AdaptiveConcurrencyManager};
 
 /// JIT execution engine
 pub struct JitEngine {
+    #[allow(dead_code)]
     context: LlvmContext,
     profiler: GlobalProfiler,
+    #[allow(dead_code)]
     specializer: Specializer,
+    #[allow(dead_code)]
     type_tracker: TypeTracker,
     function_cache: FunctionCache,
+    #[allow(dead_code)]
     inliner: Inliner,
+    #[allow(dead_code)]
     reoptimizer: Reoptimizer,
+    #[allow(dead_code)]
     memory_manager: AdaptiveMemoryManager,
     concurrency_manager: AdaptiveConcurrencyManager,
+    #[allow(dead_code)]
     symbol_registry: &'static SymbolRegistry,
 }
 
@@ -43,7 +50,8 @@ impl JitEngine {
     /// Compile a program for JIT execution
     pub fn compile_program(&mut self, program: &Program) -> Result<()> {
         // Initialize concurrency manager
-        self.concurrency_manager.initialize_thread_pool()
+        self.concurrency_manager
+            .initialize_thread_pool()
             .map_err(|e| anyhow::anyhow!("Failed to initialize thread pool: {}", e))?;
 
         // Analyze call graph for optimization
@@ -59,13 +67,15 @@ impl JitEngine {
 
         // Check cache first
         // TODO: Create specialization key from function name and args
-        
+
         // Record call for profiling
         let duration = start.elapsed();
         self.profiler.record_call(function_name, duration);
 
         // Check for hot functions periodically
-        if self.profiler.get_metrics(function_name)
+        if self
+            .profiler
+            .get_metrics(function_name)
             .map(|m| m.call_count % 1000 == 0)
             .unwrap_or(false)
         {
@@ -79,7 +89,10 @@ impl JitEngine {
     }
 
     /// Optimize hot functions
-    fn optimize_hot_functions(&mut self, _hot_functions: &[super::profiler::HotFunction]) -> Result<()> {
+    fn optimize_hot_functions(
+        &mut self,
+        _hot_functions: &[super::profiler::HotFunction],
+    ) -> Result<()> {
         for _hot_func in _hot_functions {
             // Get specialization key
             // Create specialized version
@@ -98,4 +111,3 @@ impl JitEngine {
         self.function_cache.stats()
     }
 }
-

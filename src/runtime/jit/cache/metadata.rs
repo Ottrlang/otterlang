@@ -31,4 +31,3 @@ impl Default for CacheMetadata {
         Self::new(Duration::ZERO)
     }
 }
-

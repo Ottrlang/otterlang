@@ -1,4 +1,12 @@
+pub mod builtins;
+pub mod fmt;
 pub mod io;
+pub mod json;
 pub mod math;
+pub mod net;
+pub mod rand;
+pub mod runtime;
+pub mod sync;
 pub mod sys;
+pub mod task;
 pub mod time;

@@ -1,0 +1,18 @@
+# 🦦 OtterLang JSON Module - JSON Encoding/Decoding
+
+# Encode object to JSON string
+fn encode(obj: any) -> string:
+    return json.encode(obj)
+
+# Decode JSON string to object
+fn decode(str: string) -> any:
+    return json.decode(str)
+
+# Pretty-print JSON string
+fn pretty(str: string) -> string:
+    return json.pretty(str)
+
+# Validate JSON string
+fn validate(str: string) -> bool:
+    return json.validate(str)
+

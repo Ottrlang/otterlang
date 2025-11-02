@@ -1,0 +1,45 @@
+# Rust build artifacts
+/target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Compilation artifacts
+*.o
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Cache directories
+.cache/
+*.cache
+.otter_cache_local/
+
+# Temporary files
+*.tmp
+*.log
+*.orig
+
+# Coverage reports
+tarpaulin-report.html
+coverage/
+
+# Environment files
+.env
+.env.local
+
+# Release artifacts (keep the workflow, but ignore generated files)
+release/
+
+# FFI bridge build artifacts
+ffi/*/target/
+

@@ -1,5 +1,5 @@
-use crate::ast::nodes::Expr;
 use super::RuntimeConstant;
+use crate::ast::nodes::Expr;
 
 /// Propagates constant values through expressions
 pub struct ConstantPropagator;
@@ -20,11 +20,10 @@ impl ConstantPropagator {
                 result.extend(self.extract_constants(right));
                 result
             }
-            Expr::Call { args, .. } => {
-                args.iter()
-                    .flat_map(|arg| self.extract_constants(arg))
-                    .collect()
-            }
+            Expr::Call { args, .. } => args
+                .iter()
+                .flat_map(|arg| self.extract_constants(arg))
+                .collect(),
             _ => vec![None],
         }
     }
@@ -54,4 +53,3 @@ impl Default for ConstantPropagator {
         Self::new()
     }
 }
-

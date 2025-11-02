@@ -1,0 +1,38 @@
+# 🦦 OtterLang Net Module - Networking
+
+# Listen on address (returns Listener handle)
+fn listen(addr: string) -> Listener:
+    return net.listen(addr)
+
+# Dial address (returns Conn handle)
+fn dial(addr: string) -> Conn:
+    return net.dial(addr)
+
+# Send data over connection
+fn send(conn: Conn, data: string):
+    net.send(conn, data)
+
+# Receive data from connection
+fn recv(conn: Conn) -> string:
+    return net.recv(conn)
+
+# Close connection
+fn close(conn: Conn):
+    net.close(conn)
+
+# HTTP GET request
+fn http_get(url: string) -> Response:
+    return net.http_get(url)
+
+# HTTP POST request
+fn http_post(url: string, body: string) -> Response:
+    return net.http_post(url, body)
+
+# Get response status code
+fn response_status(response: Response) -> int:
+    return net.response.status(response)
+
+# Get response body
+fn response_body(response: Response) -> string:
+    return net.response.body(response)
+

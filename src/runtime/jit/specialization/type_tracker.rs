@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use super::RuntimeType;
+use std::collections::HashMap;
 
 /// Tracks runtime types at call sites
 pub struct TypeTracker {
@@ -64,4 +64,3 @@ impl Default for TypeTracker {
         Self::new()
     }
 }
-

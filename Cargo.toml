@@ -2,6 +2,17 @@
 name = "otterlang"
 version = "0.1.0"
 edition = "2021"
+license = "MIT"
+repository = "https://github.com/jonathanmagambo/otterlang"
+readme = "README.md"
+description = "An experimental indentation-sensitive programming language with LLVM backend"
+keywords = ["language", "compiler", "programming-language", "llvm", "jit"]
+categories = ["development-tools", "programming"]
+authors = ["OtterLang Contributors"]
+
+[features]
+default = []
+task-runtime = []
 
 [dependencies]
 anyhow = "1.0"
@@ -21,9 +32,13 @@ indicatif = "0.17"
 inkwell = { version = "0.2", features = ["llvm15-0"] }
 libloading = "0.8"
 libm = "0.2"
+libc = "0.2"
 memmap2 = "0.9"
 parking_lot = "0.12"
 rayon = "1.8"
+crossbeam-channel = "0.5"
+crossbeam-deque = "0.8"
+crossbeam-utils = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.9"
 sha1 = "0.10"

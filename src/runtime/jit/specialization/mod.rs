@@ -1,17 +1,17 @@
 // JIT Specialization System
-pub mod key;
 pub mod constant_prop;
-pub mod type_tracker;
+pub mod key;
 pub mod specializer;
+pub mod type_tracker;
 
-pub use key::SpecializationKey;
 pub use constant_prop::ConstantPropagator;
-pub use type_tracker::TypeTracker;
+pub use key::SpecializationKey;
 pub use specializer::Specializer;
+pub use type_tracker::TypeTracker;
 
 use crate::runtime::symbol_registry::FfiType;
-use std::hash::{Hash, Hasher};
 use ahash::AHasher;
+use std::hash::{Hash, Hasher};
 
 /// Runtime type information for specialization
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -99,11 +99,6 @@ impl CallSiteContext {
     pub fn specialization_key(&self) -> SpecializationKey {
         let arg_types = self.arg_types.clone();
         let arg_constants = self.arg_constants.clone();
-        SpecializationKey::new(
-            self.function_name.clone(),
-            arg_types,
-            arg_constants,
-        )
+        SpecializationKey::new(self.function_name.clone(), arg_types, arg_constants)
     }
 }
-

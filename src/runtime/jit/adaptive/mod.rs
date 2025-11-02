@@ -1,7 +1,6 @@
 // Adaptive Management System
-pub mod memory;
 pub mod concurrency;
+pub mod memory;
 
-pub use memory::AdaptiveMemoryManager;
 pub use concurrency::AdaptiveConcurrencyManager;
-
+pub use memory::AdaptiveMemoryManager;

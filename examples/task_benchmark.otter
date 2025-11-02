@@ -1,0 +1,69 @@
+use otter:task
+use otter:time
+use otter:math
+use otter:fmt
+
+const NUM_TASKS = 50_000
+const WORKERS = 8
+
+fn job_payload(id: int) -> float:
+    id_float = id * 1.0
+    value = math.sin(id_float) + math.cos(id_float / 2.0)
+    return value * value + (id % 7) * 1.0
+
+fn worker(id: int, jobs: Channel<int>, results: Channel<float>, done: Channel<int>):
+    processed = 0
+    while true:
+        job_id = task.recv_int(jobs)
+        if job_id < 0:
+            break
+        result = job_payload(job_id)
+        task.send_float(results, result)
+        processed = processed + 1
+    task.send_int(done, processed)
+
+fn collector(results: Channel<float>, total_jobs: int, summary: Channel<float>):
+    accumulated = 0.0
+    for _ in 0..total_jobs:
+        accumulated = accumulated + task.recv_float(results)
+    task.send_float(summary, accumulated)
+
+fn main:
+    fmt.println("🦦 Task runtime benchmark starting…")
+    start_ms = time.now_ms()
+
+    jobs = task.channel_int()
+    results = task.channel_float()
+    done = task.channel_int()
+    summary = task.channel_float()
+
+    # Note: Lambda closures with captured variables are not yet fully supported
+    # For now, task.spawn expects a function pointer without closure capture
+    # We'll need to restructure this to work without closures
+    
+    # Simplified version - just spawn worker tasks
+    workers_count = 8.0
+    for i in 0..workers_count:
+        # TODO: Implement proper task spawning with arguments
+        pass
+
+    num_tasks_int = 50_000.0
+    for i in 0..num_tasks_int:
+        task.send_int(jobs, i)
+
+    for _ in 0..workers_count:
+        task.send_int(jobs, -1)
+
+    total_processed = 0
+    for _ in 0..workers_count:
+        total_processed = total_processed + task.recv_int(done)
+
+    total_sum = task.recv_float(summary)
+    task.join(collectors)
+
+    end_ms = time.now_ms()
+    elapsed = end_ms - start_ms
+
+    fmt.println(f"Processed {total_processed} jobs")
+    fmt.println(f"Result accumulator: {total_sum}")
+    fmt.println(f"Elapsed time: {elapsed} ms")

@@ -90,4 +90,3 @@ impl Default for HotDetector {
         Self::new(HotDetectorConfig::default())
     }
 }
-

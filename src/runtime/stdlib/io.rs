@@ -1,8 +1,37 @@
 use std::ffi::{CStr, CString};
-use std::io::{self, BufRead, Write};
+use std::fs;
+use std::io::{self, BufRead, BufReader, Write};
 use std::os::raw::c_char;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+use once_cell::sync::Lazy;
+use parking_lot::RwLock;
 
 use crate::runtime::symbol_registry::{FfiFunction, FfiSignature, FfiType, SymbolRegistry};
+
+// ============================================================================
+// Buffer Management
+// ============================================================================
+
+type HandleId = u64;
+static NEXT_HANDLE_ID: AtomicU64 = AtomicU64::new(1);
+
+fn next_handle_id() -> HandleId {
+    NEXT_HANDLE_ID.fetch_add(1, Ordering::SeqCst)
+}
+
+struct Buffer {
+    _id: HandleId,
+    data: Vec<u8>,
+    position: usize,
+}
+
+static BUFFERS: Lazy<RwLock<std::collections::HashMap<HandleId, Buffer>>> =
+    Lazy::new(|| RwLock::new(std::collections::HashMap::new()));
+
+// ============================================================================
+// File I/O Functions
+// ============================================================================
 
 #[no_mangle]
 pub extern "C" fn otter_std_io_print(message: *const c_char) {
@@ -59,6 +88,200 @@ pub extern "C" fn otter_std_io_free_string(ptr: *mut c_char) {
     }
 }
 
+#[no_mangle]
+pub extern "C" fn otter_std_io_read(path: *const c_char) -> *mut c_char {
+    if path.is_null() {
+        return std::ptr::null_mut();
+    }
+
+    let path_str = unsafe { CStr::from_ptr(path).to_str().unwrap_or("").to_string() };
+
+    match fs::read_to_string(&path_str) {
+        Ok(content) => CString::new(content)
+            .ok()
+            .map(CString::into_raw)
+            .unwrap_or(std::ptr::null_mut()),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn otter_std_io_write(path: *const c_char, data: *const c_char) -> i32 {
+    if path.is_null() || data.is_null() {
+        return 0;
+    }
+
+    let path_str = unsafe { CStr::from_ptr(path).to_str().unwrap_or("").to_string() };
+
+    let data_str = unsafe { CStr::from_ptr(data).to_str().unwrap_or("").to_string() };
+
+    match fs::write(&path_str, data_str.as_bytes()) {
+        Ok(_) => 1,
+        Err(_) => 0,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn otter_std_io_copy(src: *const c_char, dst: *const c_char) -> i32 {
+    if src.is_null() || dst.is_null() {
+        return 0;
+    }
+
+    let src_str = unsafe { CStr::from_ptr(src).to_str().unwrap_or("").to_string() };
+
+    let dst_str = unsafe { CStr::from_ptr(dst).to_str().unwrap_or("").to_string() };
+
+    match fs::copy(&src_str, &dst_str) {
+        Ok(_) => 1,
+        Err(_) => 0,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn otter_std_io_lines(path: *const c_char) -> u64 {
+    if path.is_null() {
+        return 0;
+    }
+
+    let path_str = unsafe { CStr::from_ptr(path).to_str().unwrap_or("").to_string() };
+
+    match fs::File::open(&path_str) {
+        Ok(file) => {
+            let reader = BufReader::new(file);
+            let mut lines_list = Vec::new();
+
+            for line in reader.lines() {
+                if let Ok(line_str) = line {
+                    lines_list.push(line_str);
+                }
+            }
+
+            // Create a list handle using builtins module
+            // We'll use the builtin list functions directly
+            extern "C" {
+                fn otter_builtin_list_new() -> u64;
+                fn otter_builtin_append_list_string(handle: u64, val: *const c_char) -> i32;
+            }
+
+            let list_handle = unsafe { otter_builtin_list_new() };
+
+            for line in lines_list {
+                let cstr = CString::new(line).unwrap();
+                let ptr = cstr.into_raw();
+                unsafe {
+                    let _ = otter_builtin_append_list_string(list_handle, ptr);
+                    let _ = CString::from_raw(ptr);
+                }
+            }
+
+            list_handle
+        }
+        Err(_) => 0,
+    }
+}
+
+// ============================================================================
+// Buffer Operations
+// ============================================================================
+
+#[no_mangle]
+pub extern "C" fn otter_std_io_buffer(data: *const c_char) -> u64 {
+    let id = next_handle_id();
+    let buffer = if data.is_null() {
+        Buffer {
+            _id: id,
+            data: Vec::new(),
+            position: 0,
+        }
+    } else {
+        let data_str = unsafe { CStr::from_ptr(data).to_str().unwrap_or("").to_string() };
+        Buffer {
+            _id: id,
+            data: data_str.into_bytes(),
+            position: 0,
+        }
+    };
+
+    BUFFERS.write().insert(id, buffer);
+    id
+}
+
+#[no_mangle]
+pub extern "C" fn otter_std_io_buffer_read(handle: u64, n: i64) -> *mut c_char {
+    let mut buffers = BUFFERS.write();
+    if let Some(buffer) = buffers.get_mut(&handle) {
+        let remaining = buffer.data.len() - buffer.position;
+        let read_size = if n <= 0 || n as usize > remaining {
+            remaining
+        } else {
+            n as usize
+        };
+
+        if read_size == 0 {
+            return std::ptr::null_mut();
+        }
+
+        let start = buffer.position;
+        let end = buffer.position + read_size;
+        buffer.position = end;
+
+        let bytes = &buffer.data[start..end];
+        if let Ok(s) = String::from_utf8(bytes.to_vec()) {
+            CString::new(s)
+                .ok()
+                .map(CString::into_raw)
+                .unwrap_or(std::ptr::null_mut())
+        } else {
+            std::ptr::null_mut()
+        }
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn otter_std_io_buffer_write(handle: u64, bytes: *const c_char) -> i32 {
+    if bytes.is_null() {
+        return 0;
+    }
+
+    let bytes_str = unsafe { CStr::from_ptr(bytes).to_str().unwrap_or("").to_string() };
+
+    let mut buffers = BUFFERS.write();
+    if let Some(buffer) = buffers.get_mut(&handle) {
+        buffer.data.extend_from_slice(bytes_str.as_bytes());
+        1
+    } else {
+        0
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn otter_std_io_buffer_clear(handle: u64) {
+    let mut buffers = BUFFERS.write();
+    if let Some(buffer) = buffers.get_mut(&handle) {
+        buffer.data.clear();
+        buffer.position = 0;
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn otter_std_io_buffer_data(handle: u64) -> *mut c_char {
+    let buffers = BUFFERS.read();
+    if let Some(buffer) = buffers.get(&handle) {
+        if let Ok(s) = String::from_utf8(buffer.data.clone()) {
+            CString::new(s)
+                .ok()
+                .map(CString::into_raw)
+                .unwrap_or(std::ptr::null_mut())
+        } else {
+            std::ptr::null_mut()
+        }
+    } else {
+        std::ptr::null_mut()
+    }
+}
+
 fn register_std_io_symbols(registry: &SymbolRegistry) {
     registry.register(FfiFunction {
         name: "std.io.print".into(),
@@ -94,6 +317,60 @@ fn register_std_io_symbols(registry: &SymbolRegistry) {
         name: "std.io.free".into(),
         symbol: "otter_std_io_free_string".into(),
         signature: FfiSignature::new(vec![FfiType::Str], FfiType::Unit),
+    });
+
+    registry.register(FfiFunction {
+        name: "io.read".into(),
+        symbol: "otter_std_io_read".into(),
+        signature: FfiSignature::new(vec![FfiType::Str], FfiType::Str),
+    });
+
+    registry.register(FfiFunction {
+        name: "io.write".into(),
+        symbol: "otter_std_io_write".into(),
+        signature: FfiSignature::new(vec![FfiType::Str, FfiType::Str], FfiType::I32),
+    });
+
+    registry.register(FfiFunction {
+        name: "io.copy".into(),
+        symbol: "otter_std_io_copy".into(),
+        signature: FfiSignature::new(vec![FfiType::Str, FfiType::Str], FfiType::I32),
+    });
+
+    registry.register(FfiFunction {
+        name: "io.lines".into(),
+        symbol: "otter_std_io_lines".into(),
+        signature: FfiSignature::new(vec![FfiType::Str], FfiType::Opaque),
+    });
+
+    registry.register(FfiFunction {
+        name: "io.buffer".into(),
+        symbol: "otter_std_io_buffer".into(),
+        signature: FfiSignature::new(vec![FfiType::Str], FfiType::Opaque),
+    });
+
+    registry.register(FfiFunction {
+        name: "io.buffer.read".into(),
+        symbol: "otter_std_io_buffer_read".into(),
+        signature: FfiSignature::new(vec![FfiType::Opaque, FfiType::I64], FfiType::Str),
+    });
+
+    registry.register(FfiFunction {
+        name: "io.buffer.write".into(),
+        symbol: "otter_std_io_buffer_write".into(),
+        signature: FfiSignature::new(vec![FfiType::Opaque, FfiType::Str], FfiType::I32),
+    });
+
+    registry.register(FfiFunction {
+        name: "io.buffer.clear".into(),
+        symbol: "otter_std_io_buffer_clear".into(),
+        signature: FfiSignature::new(vec![FfiType::Opaque], FfiType::Unit),
+    });
+
+    registry.register(FfiFunction {
+        name: "io.buffer.data".into(),
+        symbol: "otter_std_io_buffer_data".into(),
+        signature: FfiSignature::new(vec![FfiType::Opaque], FfiType::Str),
     });
 }
 

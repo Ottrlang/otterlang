@@ -1,12 +1,13 @@
-use anyhow::Result;
 use crate::ast::nodes::Program;
 use crate::runtime::symbol_registry::SymbolRegistry;
+use anyhow::Result;
 
 use super::engine::JitEngine;
 
 /// JIT executor that coordinates program execution
 pub struct JitExecutor {
     engine: JitEngine,
+    #[allow(dead_code)]
     program: Program,
 }
 
@@ -15,10 +16,7 @@ impl JitExecutor {
         let mut engine = JitEngine::new(symbol_registry)?;
         engine.compile_program(&program)?;
 
-        Ok(Self {
-            engine,
-            program,
-        })
+        Ok(Self { engine, program })
     }
 
     /// Execute the main function
@@ -42,4 +40,3 @@ pub struct ExecutorStats {
     pub profiler_metrics: Vec<super::profiler::FunctionMetrics>,
     pub cache_stats: super::cache::function_cache::CacheStats,
 }
-

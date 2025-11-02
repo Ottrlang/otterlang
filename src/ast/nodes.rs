@@ -29,7 +29,7 @@ impl Program {
 pub struct Function {
     pub name: String,
     pub params: Vec<Param>,
-    pub ret_ty: Option<String>,
+    pub ret_ty: Option<Type>,
     pub body: Block,
 }
 
@@ -37,7 +37,7 @@ impl Function {
     pub fn new(
         name: impl Into<String>,
         params: Vec<Param>,
-        ret_ty: Option<String>,
+        ret_ty: Option<Type>,
         body: Block,
     ) -> Self {
         Self {
@@ -49,14 +49,23 @@ impl Function {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Type {
+    Simple(String),
+    Generic {
+        base: String,
+        args: Vec<Type>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Param {
     pub name: String,
-    pub ty: Option<String>,
+    pub ty: Option<Type>,
 }
 
 impl Param {
-    pub fn new(name: impl Into<String>, ty: Option<String>) -> Self {
+    pub fn new(name: impl Into<String>, ty: Option<Type>) -> Self {
         Self {
             name: name.into(),
             ty,
@@ -180,7 +189,7 @@ impl Block {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub enum Expr {
     // Literals
     Literal(Literal),
@@ -229,12 +238,19 @@ pub enum Expr {
         parts: Vec<FStringPart>,
     },
 
+    // Lambda expressions
+    Lambda {
+        params: Vec<Param>,
+        ret_ty: Option<Type>,
+        body: Block,
+    },
+
     // Async operations
     Await(Box<Expr>),
     Spawn(Box<Expr>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub enum FStringPart {
     Text(String),
     Expr(Box<Expr>),

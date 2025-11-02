@@ -1,131 +1,153 @@
-# OtterLang Hybrid Runtime System - Implementation Plan
+# OtterLang Development Roadmap
 
-## Goal
-Design and implement a hybrid runtime system that delivers runtime efficiency beyond Rust by combining JIT specialization, in-memory optimization, caching, and dynamic recompilation.
+This document tracks planned features and improvements for OtterLang.
 
-## Architecture Overview
+## Current Status: Early Access (v0.1.0)
 
-The hybrid runtime system will operate alongside the existing static compilation pipeline, providing:
-- **JIT Execution**: Compile and execute code on-the-fly without full binary generation
-- **Hot Function Detection**: Profile runtime execution to identify frequently called functions
-- **JIT Specialization**: Create optimized versions of functions based on runtime types and constants
-- **Inlining & Re-optimization**: Dynamically inline hot call paths and re-optimize
-- **Function Caching**: Cache compiled function code for reuse across invocations
-- **Adaptive Memory Management**: Optimize memory usage based on runtime patterns
-- **Adaptive Concurrency**: Manage thread pools and parallelism based on workload
+### ✅ Completed for EA Release
 
-## Implementation Checklist
+- [x] Core compiler pipeline (lexer, parser, codegen)
+- [x] LLVM backend integration
+- [x] CLI with run/build commands
+- [x] Basic standard library modules
+- [x] Rust FFI support
+- [x] Compilation caching
+- [x] Error diagnostics
+- [x] `elif` statement support
+- [x] Documentation and installation guides
+- [x] CI/CD setup
 
-### Phase 1: Foundation & JIT Engine ✅
-- [x] Create plan.md and structure.md
-- [ ] Design JIT runtime module structure
-- [ ] Implement LLVM ORC JIT execution engine
-- [ ] Create basic JIT compilation pipeline
-- [ ] Add runtime execution entry point
+### 🔄 In Progress / Experimental
 
-### Phase 2: Hot Function Detection ✅
-- [ ] Implement runtime profiling infrastructure
-- [ ] Add function call counters and timing
-- [ ] Create hot function detection thresholds
-- [ ] Build sampling profiler for call sites
-- [ ] Add instrumentation hooks in codegen
+- [ ] Task runtime (behind feature flag)
+- [ ] JIT execution engine
+- [ ] Windows platform support
 
-### Phase 3: JIT Specialization ✅
-- [ ] Design specialization key system (types + constants)
-- [ ] Implement runtime type tracking
-- [ ] Create specialized function versions
-- [ ] Add constant propagation analysis
-- [ ] Build specialization cache lookup
+## Short-Term Goals (v0.2.0)
 
-### Phase 4: Inlining & Re-optimization ✅
-- [ ] Implement inline candidate detection
-- [ ] Add inline function cloning
-- [ ] Create post-inline optimization passes
-- [ ] Build call graph analysis
-- [ ] Add re-optimization triggers
+### Module System
 
-### Phase 5: Function Caching ✅
-- [ ] Design function cache data structures
-- [ ] Implement cache key generation (specialization keys)
-- [ ] Add cache storage and retrieval
-- [ ] Create cache eviction policies
-- [ ] Integrate with existing cache system
+- [ ] Implement `.otter` file module imports
+- [ ] Support for `use otter:module` syntax
+- [ ] Module resolution and path handling
+- [ ] Include module dependencies in cache fingerprint
 
-### Phase 6: Adaptive Memory Management ✅
-- [ ] Implement memory usage tracking
-- [ ] Add adaptive allocation strategies
-- [ ] Create memory pressure detection
-- [ ] Build GC-like cleanup (if needed)
-- [ ] Add memory pool optimization
+### Language Features
 
-### Phase 7: Adaptive Concurrency ✅
-- [ ] Implement workload analysis
-- [ ] Add dynamic thread pool sizing
-- [ ] Create parallel execution strategies
-- [ ] Build task scheduling optimization
-- [ ] Add concurrency profiling
+- [ ] Match expressions (pattern matching)
+- [ ] Struct/record types
+- [ ] Array/list literals
+- [ ] Dictionary/map literals
+- [ ] Type aliases
+- [ ] Generic type parameters
 
-### Phase 8: Integration ✅
-- [ ] Integrate JIT runtime into CLI
-- [ ] Add runtime mode selection (static vs JIT)
-- [ ] Create hybrid execution mode
-- [ ] Add performance comparison tools
-- [ ] Update documentation
+### Developer Experience
 
-## Technical Approach
+- [ ] REPL (read-eval-print loop)
+- [ ] Formatter (`otter fmt`)
+- [ ] Syntax highlighting (Tree-sitter or TextMate grammar)
+- [ ] Better error messages with suggestions
+- [ ] Debug mode with stack traces
+
+## Medium-Term Goals (v0.3.0 - v0.5.0)
+
+### Type System
+
+- [ ] Type inference improvements
+- [ ] Type checking phase
+- [ ] Better type error messages
+- [ ] Type annotations for generics
+
+### Standard Library
+
+- [ ] Complete all stdlib module implementations
+- [ ] Async/await support
+- [ ] File system operations
+- [ ] HTTP client/server
+- [ ] Database drivers (SQLite, Postgres)
+
+### Performance
+
+- [ ] Optimization passes
+- [ ] Profile-guided optimization
+- [ ] Link-time optimization (LTO)
+- [ ] Function inlining
+
+### Task Runtime
+
+- [ ] Complete task runtime implementation (see TASK_RUNTIME_TODO.md)
+- [ ] Work-stealing scheduler
+- [ ] Typed channels
+- [ ] Task cancellation
+- [ ] Task-local storage
+
+## Long-Term Goals (v1.0.0+)
+
+### Package Management
+
+- [ ] Package manager (`otterpkg` or similar)
+- [ ] Dependency resolution
+- [ ] Package registry
+- [ ] Version management
+
+### Tooling
+
+- [ ] Language Server Protocol (LSP)
+- [ ] Debugger integration
+- [ ] Profiler tools
+- [ ] Benchmarking framework
+
+### Platform Support
+
+- [ ] Full Windows support
+- [ ] Cross-compilation
+- [ ] WebAssembly target
+- [ ] Embedded targets
+
+### Documentation
+
+- [ ] Language specification
+- [ ] Standard library documentation
+- [ ] Tutorial series
+- [ ] API reference
+
+## Experimental Features
 
 ### JIT Engine
-- Use LLVM ORC JIT for compilation and execution
-- Lazy compilation: compile functions on first call
-- Incremental compilation: compile only hot paths initially
 
-### Hot Function Detection
-- Call counter threshold: function becomes "hot" after N calls
-- Time-based threshold: functions taking >X% of total time
-- Call graph analysis: detect hot call paths
-
-### Specialization
-- Type specialization: create versions for specific type combinations
-- Constant specialization: optimize for known constant values
-- Hybrid specialization: combine types + constants
-
-### Caching Strategy
-- Cache by specialization key (function name + types + constants)
-- LRU eviction policy
-- Memory-bounded cache size
-- Persistent cache across program runs
+- [ ] Hot function detection
+- [ ] Adaptive optimization
+- [ ] Code specialization
+- [ ] Function caching
 
 ### Memory Management
-- Track allocations per function
-- Adaptive pooling for frequently allocated sizes
-- Memory pressure triggers optimization passes
-- Profile-driven memory optimization
 
-### Concurrency
-- Profile parallelism opportunities
-- Dynamic thread pool sizing based on workload
-- Work-stealing for load balancing
-- Adaptive granularity for parallel operations
+- [ ] Garbage collection options
+- [ ] Memory profiling
+- [ ] Reference counting
 
-## Performance Targets
+## Known Issues & Technical Debt
 
-- **Startup Time**: JIT mode should start faster than full compilation
-- **Hot Path Performance**: Specialized functions should match or exceed static compilation
-- **Cold Path Overhead**: Minimal overhead for infrequently called functions
-- **Memory Efficiency**: Cache should use bounded memory with efficient eviction
-- **Concurrency**: Adaptive parallelism should improve throughput
+1. **Module System**: Currently only Rust FFI imports work
+2. **Type System**: Limited inference, needs type checking phase
+3. **Error Messages**: Could be more helpful with suggestions
+4. **Windows Support**: Experimental, needs testing
+5. **Task Runtime**: Incomplete implementation
 
-## Dependencies
+## Contributing
 
-- LLVM ORC JIT APIs (via inkwell)
-- Thread-safe data structures (parking_lot already available)
-- Profiling infrastructure (extend existing profiler)
-- Runtime type information (extend AST type system)
+See the main README for contribution guidelines. Focus areas for contributors:
 
-## Notes
+- Module system implementation
+- Standard library completeness
+- Error message improvements
+- Documentation
+- Testing coverage
 
-- The system should gracefully degrade if JIT compilation fails
-- Profile data should be minimal overhead (<1% typically)
-- Cache should be persistent across runs for better performance
-- Specialization should be conservative to avoid code bloat
+## Versioning
+
+See CHANGELOG.md for versioning policy details.
+
+- **v0.x.x**: Early access, breaking changes allowed
+- **v1.0.0+**: Stable API, semantic versioning
 

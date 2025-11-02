@@ -1,10 +1,10 @@
 // Function Caching System
-pub mod function_cache;
 pub mod eviction;
+pub mod function_cache;
 pub mod metadata;
 
-pub use function_cache::FunctionCache;
 pub use eviction::{EvictionPolicy, LruEvictionPolicy};
+pub use function_cache::FunctionCache;
 pub use metadata::CacheMetadata;
 
 use super::specialization::SpecializationKey;
@@ -30,4 +30,3 @@ impl CachedFunction {
         self.code.len()
     }
 }
-

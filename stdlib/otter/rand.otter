@@ -1,0 +1,22 @@
+# 🦦 OtterLang Rand Module - Random Number Generation
+
+# Seed the random number generator
+fn seed(n: int):
+    rand.seed(n)
+
+# Generate random integer in range [min, max)
+fn int(min: int, max: int) -> int:
+    return rand.int(min, max)
+
+# Generate random float in range [0.0, 1.0)
+fn float() -> float:
+    return rand.float()
+
+# Generate n random bytes (returns hex string)
+fn bytes(n: int) -> string:
+    return rand.bytes(n)
+
+# Generate UUID v4 string
+fn uuid() -> string:
+    return rand.uuid()
+

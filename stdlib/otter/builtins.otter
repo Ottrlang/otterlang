@@ -1,0 +1,136 @@
+# 🦦 OtterLang Built-ins - Core Language Functions
+# These are core built-in functions available at the language level
+
+# Get length of a collection
+fn len(x: any) -> int:
+    # Works with strings, lists, maps
+    if type_of(x) == "string":
+        return len(x)
+    elif type_of(x) == "list":
+        return len<list>(x)
+    elif type_of(x) == "map":
+        return len<map>(x)
+    else:
+        panic("len() not supported for this type")
+
+# Get capacity of a collection
+fn cap(x: any) -> int:
+    if type_of(x) == "string":
+        return cap(x)
+    elif type_of(x) == "list":
+        return cap<list>(x)
+    else:
+        panic("cap() not supported for this type")
+
+# Append a value to a list
+fn append(list: List, val: any) -> bool:
+    if type_of(val) == "string":
+        return append<list,string>(list, val) != 0
+    elif type_of(val) == "int":
+        return append<list,int>(list, val) != 0
+    elif type_of(val) == "float":
+        return append<list,float>(list, val) != 0
+    else:
+        panic("append() not supported for this value type")
+
+# Delete a key from a map
+fn delete(map: Map, key: string) -> bool:
+    return delete<map>(map, key) != 0
+
+# Generate a range (alternative to start..end syntax)
+fn range(start: int, end: int) -> List:
+    return range<int>(start, end)
+
+fn range_float(start: float, end: float) -> List:
+    return range<float>(start, end)
+
+# Enumerate a list with indices
+fn enumerate(list: List) -> List:
+    return enumerate<list>(list)
+
+# List operations
+fn list_new() -> List:
+    return list.new()
+
+fn list_get(list: List, index: int) -> string:
+    return list.get(list, index)
+
+# Map operations
+fn map_new() -> Map:
+    return map.new()
+
+fn map_get(map: Map, key: string) -> string:
+    return map.get(map, key)
+
+fn map_set(map: Map, key: string, value: string) -> bool:
+    return map.set(map, key, value) != 0
+
+# Error handling - panic immediately terminates execution
+fn panic(msg: string):
+    panic(msg)
+
+# Error handling - recover from panic
+# Returns panic message if recovering, null otherwise
+fn recover() -> string:
+    return recover()
+
+# Error handling - try executes function and return result or error
+# Returns a handle that can be used with try.result() and try.error()
+fn try(fn: fn() -> string) -> TryHandle:
+    return try(fn)
+
+# Get result from try handle
+fn try_result(handle: TryHandle) -> string:
+    return try.result(handle)
+
+# Get error from try handle (returns error handle, 0 if no error)
+fn try_error(handle: TryHandle) -> Error:
+    return try.error(handle)
+
+# Get error message from error handle
+fn error_message(error: Error) -> string:
+    return error.message(error)
+
+# Defer function execution until scope exit
+fn defer(fn: fn()):
+    defer(fn)
+
+# Get type of a value
+fn type_of(x: any) -> string:
+    # Type-specific implementations
+    if type_of(x) == "string":
+        return type_of<string>(x)
+    elif type_of(x) == "int":
+        return type_of<int>(x)
+    elif type_of(x) == "float":
+        return type_of<float>(x)
+    elif type_of(x) == "bool":
+        return type_of<bool>(x)
+    elif type_of(x) == "list":
+        return type_of<list>(x)
+    elif type_of(x) == "map":
+        return type_of<map>(x)
+    else:
+        return type_of<opaque>(x)
+
+# Get fields of an object/struct
+fn fields(obj: any) -> string:
+    return fields(obj)
+
+# Convert value to string
+fn stringify(x: any) -> string:
+    if type_of(x) == "string":
+        return stringify<string>(x)
+    elif type_of(x) == "int":
+        return stringify<int>(x)
+    elif type_of(x) == "float":
+        return stringify<float>(x)
+    elif type_of(x) == "bool":
+        return stringify<bool>(x)
+    elif type_of(x) == "list":
+        return stringify<list>(x)
+    elif type_of(x) == "map":
+        return stringify<map>(x)
+    else:
+        return "unknown"
+

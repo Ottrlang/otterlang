@@ -1,7 +1,0 @@
-use rust:otterlang_ffi_demo
-
-fn main:
-    a = 12.5
-    b = 7.25
-    result = otterlang_ffi_demo.add(a, b)
-    print(f"{a} + {b} = {result}")

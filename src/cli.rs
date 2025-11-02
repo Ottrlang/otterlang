@@ -45,6 +45,18 @@ pub struct OtterCli {
     /// Enable release mode (O3 + LTO) when building binaries.
     release: bool,
 
+    #[arg(long, global = true)]
+    /// Enable the experimental async task runtime when executing programs.
+    tasks: bool,
+
+    #[arg(long, global = true)]
+    /// Emit verbose scheduler diagnostics from the task runtime.
+    tasks_debug: bool,
+
+    #[arg(long, global = true)]
+    /// Trace task lifecycle events from the runtime.
+    tasks_trace: bool,
+
     #[command(subcommand)]
     command: Command,
 }
@@ -86,11 +98,11 @@ fn handle_run(cli: &OtterCli, path: &Path) -> Result<()> {
             if settings.profile {
                 print_profile(&entry.metadata);
             }
-            execute_binary(&entry.binary_path)?;
+            execute_binary(&entry.binary_path, &settings)?;
         }
         CompilationResult::Compiled { artifact, metadata } => {
             println!("{} {}", "building".bold(), artifact.binary.display());
-            execute_binary(&artifact.binary)?;
+            execute_binary(&artifact.binary, &settings)?;
             if settings.dump_ir {
                 if let Some(ir) = &artifact.ir {
                     println!("{}", "== LLVM IR ==".bold());
@@ -283,6 +295,9 @@ struct CompilationSettings {
     time: bool,
     profile: bool,
     release: bool,
+    tasks: bool,
+    tasks_debug: bool,
+    tasks_trace: bool,
 }
 
 impl CompilationSettings {
@@ -294,6 +309,9 @@ impl CompilationSettings {
             time: cli.time,
             profile: cli.profile,
             release: cli.release,
+            tasks: cli.tasks,
+            tasks_debug: cli.tasks_debug,
+            tasks_trace: cli.tasks_trace,
         }
     }
 
@@ -346,8 +364,20 @@ fn canonical_or(path: &Path) -> PathBuf {
     path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
 }
 
-fn execute_binary(path: &Path) -> Result<()> {
-    let status = ProcessCommand::new(path)
+fn execute_binary(path: &Path, settings: &CompilationSettings) -> Result<()> {
+    let mut command = ProcessCommand::new(path);
+
+    if settings.tasks {
+        command.env("OTTER_TASKS_DIAGNOSTICS", "1");
+    }
+    if settings.tasks_debug {
+        command.env("OTTER_TASKS_DEBUG", "1");
+    }
+    if settings.tasks_trace {
+        command.env("OTTER_TASKS_TRACE", "1");
+    }
+
+    let status = command
         .status()
         .with_context(|| format!("failed to execute {}", path.display()))?;
 

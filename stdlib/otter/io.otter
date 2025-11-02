@@ -1,0 +1,36 @@
+# 🦦 OtterLang IO Module - Buffered I/O and Streams
+# For files, sockets, and pipes
+
+# Read entire file as string
+fn read(path: string) -> string:
+    return io.read(path)
+
+# Write data to file
+fn write(path: string, data: string) -> bool:
+    return io.write(path, data) != 0
+
+# Copy file from src to dst
+fn copy(src: string, dst: string) -> bool:
+    return io.copy(src, dst) != 0
+
+# Read all lines from file into a list
+fn lines(path: string) -> list<string>:
+    return io.lines(path)
+
+# Create a new buffer (optionally with initial data)
+fn buffer(data: string = "") -> Buffer:
+    return io.buffer(data)
+
+# Buffer operations
+fn buffer_read(buf: Buffer, n: int) -> string:
+    return io.buffer.read(buf, n)
+
+fn buffer_write(buf: Buffer, bytes: string) -> bool:
+    return io.buffer.write(buf, bytes) != 0
+
+fn buffer_clear(buf: Buffer):
+    io.buffer.clear(buf)
+
+fn buffer_data(buf: Buffer) -> string:
+    return io.buffer.data(buf)
+

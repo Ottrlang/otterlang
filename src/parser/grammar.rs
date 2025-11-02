@@ -2,7 +2,7 @@ use chumsky::prelude::*;
 use chumsky::Stream;
 
 use crate::ast::nodes::{
-    BinaryOp, Block, Expr, FStringPart, Function, Literal, Param, Program, Statement, UnaryOp,
+    BinaryOp, Block, Expr, FStringPart, Function, Literal, Param, Program, Statement, Type, UnaryOp,
 };
 use crate::lexer::token::{Span, Token, TokenKind};
 use crate::utils::errors::{Diagnostic, DiagnosticSeverity};
@@ -60,6 +60,50 @@ pub fn parse(tokens: &[Token]) -> Result<Program, Vec<ParserError>> {
 
 fn identifier_parser() -> impl Parser<TokenKind, String, Error = Simple<TokenKind>> {
     select! { TokenKind::Identifier(name) => name }
+}
+
+fn identifier_or_keyword_parser() -> impl Parser<TokenKind, String, Error = Simple<TokenKind>> {
+    select! {
+        TokenKind::Identifier(name) => name,
+        TokenKind::Fn => "fn".to_string(),
+        TokenKind::Let => "let".to_string(),
+        TokenKind::Return => "return".to_string(),
+        TokenKind::If => "if".to_string(),
+        TokenKind::Else => "else".to_string(),
+        TokenKind::Elif => "elif".to_string(),
+        TokenKind::For => "for".to_string(),
+        TokenKind::While => "while".to_string(),
+        TokenKind::Break => "break".to_string(),
+        TokenKind::Continue => "continue".to_string(),
+        TokenKind::In => "in".to_string(),
+        TokenKind::Use => "use".to_string(),
+        TokenKind::From => "from".to_string(),
+        TokenKind::As => "as".to_string(),
+        TokenKind::Async => "async".to_string(),
+        TokenKind::Await => "await".to_string(),
+        TokenKind::Spawn => "spawn".to_string(),
+        TokenKind::Match => "match".to_string(),
+        TokenKind::Case => "case".to_string(),
+        TokenKind::True => "true".to_string(),
+        TokenKind::False => "false".to_string(),
+        TokenKind::Print => "print".to_string(),
+    }
+}
+
+fn type_parser() -> impl Parser<TokenKind, Type, Error = Simple<TokenKind>> {
+    recursive(|ty| {
+        identifier_parser()
+            .then(
+                ty.separated_by(just(TokenKind::Comma))
+                    .allow_trailing()
+                    .delimited_by(just(TokenKind::Lt), just(TokenKind::Gt))
+                    .or_not()
+            )
+            .map(|(base, args)| match args {
+                Some(args) => Type::Generic { base, args },
+                None => Type::Simple(base),
+            })
+    })
 }
 
 fn parse_fstring(content: String) -> Expr {
@@ -189,8 +233,64 @@ fn literal_expr_parser() -> impl Parser<TokenKind, Expr, Error = Simple<TokenKin
 
 fn expr_parser() -> impl Parser<TokenKind, Expr, Error = Simple<TokenKind>> {
     recursive(|expr| {
+        let lambda_param = identifier_parser()
+            .then(
+                just(TokenKind::Colon)
+                    .ignore_then(type_parser())
+                    .or_not(),
+            )
+            .map(|(name, ty)| Param::new(name, ty));
+
+        let lambda_params = lambda_param
+            .separated_by(just(TokenKind::Comma))
+            .allow_trailing()
+            .delimited_by(just(TokenKind::LParen), just(TokenKind::RParen))
+            .or_not()
+            .map(|params| params.unwrap_or_default());
+
+        let lambda_ret_type = just(TokenKind::Arrow)
+            .ignore_then(type_parser())
+            .or_not();
+
+        let lambda_block = recursive(|_block| {
+            let lambda_stmt = recursive(|_stmt| {
+                // Simplified statement parser for lambdas - just expressions and returns
+                let lambda_return_stmt = just(TokenKind::Return)
+                    .ignore_then(expr.clone().or_not())
+                    .map(Statement::Return);
+
+                choice((
+                    lambda_return_stmt,
+                    expr.clone().map(Statement::Expr),
+                ))
+                .then_ignore(just(TokenKind::Newline).or_not())
+                .boxed()
+            });
+
+            lambda_stmt
+                .repeated()
+                .at_least(1)
+                .map(Block::new)
+        });
+
+        let lambda_expr = just(TokenKind::Fn)
+            .ignore_then(lambda_params)
+            .then(lambda_ret_type)
+            .then_ignore(just(TokenKind::Colon))
+            .then(
+                just(TokenKind::Newline)
+                    .ignore_then(lambda_block)
+                    .or(expr.clone().map(|expr| Block::new(vec![Statement::Expr(expr)])))
+            )
+            .map(|((params, ret_ty), body)| Expr::Lambda {
+                params,
+                ret_ty,
+                body,
+            });
+
         let atom = choice((
             literal_expr_parser(),
+            lambda_expr,
             identifier_parser().map(Expr::Identifier),
             expr.clone()
                 .delimited_by(just(TokenKind::LParen), just(TokenKind::RParen)),
@@ -201,7 +301,7 @@ fn expr_parser() -> impl Parser<TokenKind, Expr, Error = Simple<TokenKind>> {
             .clone()
             .then(
                 just(TokenKind::Dot)
-                    .ignore_then(identifier_parser())
+                    .ignore_then(identifier_or_keyword_parser())
                     .repeated(),
             )
             .foldl(|object, field| Expr::Member {
@@ -410,6 +510,19 @@ fn program_parser() -> impl Parser<TokenKind, Program, Error = Simple<TokenKind>
 
     // Create a recursive parser for statements
     let statement = recursive(|stmt| {
+        let elif_block = just(TokenKind::Elif)
+            .ignore_then(expr.clone())
+            .then_ignore(just(TokenKind::Colon))
+            .then_ignore(newline.clone())
+            .then(
+                stmt.clone()
+                    .repeated()
+                    .at_least(1)
+                    .delimited_by(just(TokenKind::Indent), just(TokenKind::Dedent))
+                    .map(Block::new),
+            )
+            .map(|(cond, block)| (cond, block));
+
         let if_stmt = just(TokenKind::If)
             .ignore_then(expr.clone())
             .then_ignore(just(TokenKind::Colon))
@@ -421,6 +534,7 @@ fn program_parser() -> impl Parser<TokenKind, Program, Error = Simple<TokenKind>
                     .delimited_by(just(TokenKind::Indent), just(TokenKind::Dedent))
                     .map(Block::new),
             )
+            .then(elif_block.repeated())
             .then(
                 just(TokenKind::Else)
                     .ignore_then(just(TokenKind::Colon))
@@ -434,10 +548,10 @@ fn program_parser() -> impl Parser<TokenKind, Program, Error = Simple<TokenKind>
                     )
                     .or_not(),
             )
-            .map(|((cond, then_block), else_block)| Statement::If {
+            .map(|(((cond, then_block), elif_blocks), else_block)| Statement::If {
                 cond: Box::new(cond),
                 then_block,
-                elif_blocks: vec![], // TODO: implement elif
+                elif_blocks,
                 else_block: else_block.map(|(_, block)| block),
             });
 
@@ -460,6 +574,19 @@ fn program_parser() -> impl Parser<TokenKind, Program, Error = Simple<TokenKind>
                 body,
             });
 
+        let while_stmt = just(TokenKind::While)
+            .ignore_then(expr.clone())
+            .then_ignore(just(TokenKind::Colon))
+            .then_ignore(newline.clone())
+            .then(
+                stmt.clone()
+                    .repeated()
+                    .at_least(1)
+                    .delimited_by(just(TokenKind::Indent), just(TokenKind::Dedent))
+                    .map(Block::new),
+            )
+            .map(|(cond, body)| Statement::While { cond, body });
+
         choice((
             print_stmt,
             return_stmt,
@@ -468,6 +595,7 @@ fn program_parser() -> impl Parser<TokenKind, Program, Error = Simple<TokenKind>
             use_stmt,
             if_stmt,
             for_stmt,
+            while_stmt,
             break_stmt,
             continue_stmt,
             expr.map(Statement::Expr),
@@ -486,7 +614,7 @@ fn program_parser() -> impl Parser<TokenKind, Program, Error = Simple<TokenKind>
     let function_param = identifier_parser()
         .then(
             just(TokenKind::Colon)
-                .ignore_then(identifier_parser())
+                .ignore_then(type_parser())
                 .or_not(),
         )
         .map(|(name, ty)| Param::new(name, ty));
@@ -499,7 +627,7 @@ fn program_parser() -> impl Parser<TokenKind, Program, Error = Simple<TokenKind>
         .map(|params| params.unwrap_or_default());
 
     let function_ret_type = just(TokenKind::Arrow)
-        .ignore_then(identifier_parser())
+        .ignore_then(type_parser())
         .or_not();
 
     let function = just(TokenKind::Fn)

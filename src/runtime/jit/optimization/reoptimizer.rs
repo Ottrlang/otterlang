@@ -1,9 +1,10 @@
+use super::call_graph::CallGraph;
 use crate::ast::nodes::{Function, Program};
 use crate::codegen::CodegenOptLevel;
-use super::call_graph::CallGraph;
 
 /// Re-optimizes hot functions
 pub struct Reoptimizer {
+    #[allow(dead_code)]
     opt_level: CodegenOptLevel,
 }
 
@@ -53,4 +54,3 @@ impl Default for Reoptimizer {
         Self::new()
     }
 }
-

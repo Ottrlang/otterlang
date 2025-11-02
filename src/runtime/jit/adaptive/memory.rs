@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use parking_lot::RwLock;
+use std::collections::HashMap;
 
 /// Adaptive memory management based on runtime patterns
 pub struct AdaptiveMemoryManager {
@@ -69,4 +69,3 @@ impl Default for AdaptiveMemoryManager {
         Self::new()
     }
 }
-

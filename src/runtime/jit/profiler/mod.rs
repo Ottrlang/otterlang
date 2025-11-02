@@ -7,8 +7,8 @@ pub use call_profiler::CallProfiler;
 pub use hot_detector::{HotDetector, HotFunction};
 pub use sampler::Sampler;
 
-use std::sync::Arc;
 use parking_lot::RwLock;
+use std::sync::Arc;
 use std::time::Duration;
 
 /// Aggregated profiling metrics for a function
@@ -97,12 +97,7 @@ impl GlobalProfiler {
     }
 
     pub fn check_hot_functions(&self) -> Vec<HotFunction> {
-        let total_time: Duration = self
-            .metrics
-            .read()
-            .values()
-            .map(|m| m.total_time)
-            .sum();
+        let total_time: Duration = self.metrics.read().values().map(|m| m.total_time).sum();
 
         let mut detector = self.detector.write();
         detector.detect_hot_functions(&self.metrics.read(), total_time)
@@ -118,4 +113,3 @@ impl Default for GlobalProfiler {
         Self::new()
     }
 }
-

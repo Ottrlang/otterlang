@@ -1,7 +1,7 @@
-use std::collections::HashMap;
 use parking_lot::RwLock;
+use std::collections::HashMap;
 
-use super::{SpecializationKey, CallSiteContext, RuntimeConstant};
+use super::{CallSiteContext, RuntimeConstant, SpecializationKey};
 use crate::ast::nodes::Function;
 
 /// Manages function specialization
@@ -94,7 +94,9 @@ impl Specializer {
         let mut function_counts: HashMap<String, usize> = HashMap::new();
 
         for key in versions.keys() {
-            *function_counts.entry(key.function_name.clone()).or_insert(0) += 1;
+            *function_counts
+                .entry(key.function_name.clone())
+                .or_insert(0) += 1;
         }
 
         SpecializationStats {
@@ -115,4 +117,3 @@ impl Default for Specializer {
         Self::new()
     }
 }
-

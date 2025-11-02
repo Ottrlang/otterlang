@@ -1,0 +1,38 @@
+# 🦦 OtterLang Time Module - Time Operations
+
+# Get current time (returns Time handle)
+fn now() -> Time:
+    return time.now()
+
+# Sleep for milliseconds
+fn sleep(ms: int):
+    time.sleep(ms)
+
+# Get duration since time
+fn since(t: Time) -> Duration:
+    return time.since(t)
+
+# Format time with format string
+fn format(t: Time, fmt: string) -> string:
+    return time.format(t, fmt)
+
+# Parse time from string
+fn parse(fmt: string, text: string) -> Time:
+    return time.parse(fmt, text)
+
+# Create ticker channel (sends every ms milliseconds)
+fn tick(ms: int) -> Channel<Time>:
+    return time.tick(ms)
+
+# Create timer channel (sends after ms milliseconds)
+fn after(ms: int) -> Channel<Time>:
+    return time.after(ms)
+
+# Get epoch milliseconds from Time
+fn epoch_ms(t: Time) -> int:
+    return time.epoch_ms(t)
+
+# Get milliseconds from Duration
+fn duration_ms(d: Duration) -> int:
+    return duration.ms(d)
+

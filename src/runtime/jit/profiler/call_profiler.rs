@@ -14,7 +14,8 @@ impl CallProfiler {
     }
 
     pub fn start_call(&mut self, function_name: &str) {
-        self.start_times.insert(function_name.to_string(), std::time::Instant::now());
+        self.start_times
+            .insert(function_name.to_string(), std::time::Instant::now());
     }
 
     pub fn end_call(&mut self, function_name: &str) -> Option<Duration> {
@@ -33,4 +34,3 @@ impl Default for CallProfiler {
         Self::new()
     }
 }
-

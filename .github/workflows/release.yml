@@ -1,0 +1,69 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-release:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            artifact_name: otterlang-linux-x86_64
+            binary_name: otterlang
+          - os: macos-latest
+            artifact_name: otterlang-macos-x86_64
+            binary_name: otterlang
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install LLVM 15
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y llvm-15 llvm-15-dev clang-15
+          echo "LLVM_SYS_150_PREFIX=/usr/lib/llvm-15" >> $GITHUB_ENV
+      
+      - name: Install LLVM 15 (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install llvm@15
+          echo "LLVM_SYS_150_PREFIX=$(brew --prefix llvm@15)" >> $GITHUB_ENV
+          echo "$(brew --prefix llvm@15)/bin" >> $GITHUB_PATH
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Build release binary
+        run: cargo build --release
+      
+      - name: Create release archive
+        shell: bash
+        run: |
+          mkdir -p release
+          cp target/release/${{ matrix.binary_name }} release/
+          tar czf ${{ matrix.artifact_name }}.tar.gz -C release ${{ matrix.binary_name }}
+      
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}.tar.gz
+      
+      - name: Create GitHub Release
+        if: matrix.os == 'ubuntu-latest'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            **/*.tar.gz
+          draft: false
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

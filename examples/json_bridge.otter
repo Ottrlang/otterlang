@@ -1,5 +1,0 @@
-use rust:rand
-
-fn main:
-    sample_json = rand.__call_json("rand.uniform", "[0.0, 10.0]")
-    print(f"rand.uniform via dispatcher -> {sample_json}")

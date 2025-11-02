@@ -1,7 +1,7 @@
-use std::sync::Arc;
 use parking_lot::RwLock;
 use rayon::ThreadPool;
 use rayon::ThreadPoolBuilder;
+use std::sync::Arc;
 use sysinfo::System;
 
 /// Adaptive concurrency management
@@ -50,7 +50,8 @@ impl AdaptiveConcurrencyManager {
         }
 
         // Update average duration
-        let total_duration = profile.avg_task_duration_ms * (profile.total_tasks - 1) as f64 + duration_ms;
+        let total_duration =
+            profile.avg_task_duration_ms * (profile.total_tasks - 1) as f64 + duration_ms;
         profile.avg_task_duration_ms = total_duration / profile.total_tasks as f64;
     }
 
@@ -85,7 +86,7 @@ impl AdaptiveConcurrencyManager {
 
     pub fn should_parallelize(&self, task_count: usize, estimated_duration_ms: f64) -> bool {
         let profile = self.workload_profile.read();
-        
+
         // Parallelize if:
         // 1. Multiple tasks
         // 2. Tasks are long enough to justify overhead
@@ -98,4 +99,3 @@ impl Default for AdaptiveConcurrencyManager {
         Self::new()
     }
 }
-

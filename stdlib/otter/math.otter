@@ -1,0 +1,81 @@
+# 🦦 OtterLang Math Module - Mathematical Functions
+
+# Absolute value
+fn abs(x: float) -> float:
+    return math.abs(x)
+
+# Square root
+fn sqrt(x: float) -> float:
+    return math.sqrt(x)
+
+# Power
+fn pow(x: float, y: float) -> float:
+    return math.pow(x, y)
+
+# Exponential
+fn exp(x: float) -> float:
+    return math.exp(x)
+
+# Natural logarithm
+fn log(x: float) -> float:
+    return math.log(x)
+
+# Trigonometric functions
+fn sin(x: float) -> float:
+    return math.sin(x)
+
+fn cos(x: float) -> float:
+    return math.cos(x)
+
+fn tan(x: float) -> float:
+    return math.tan(x)
+
+fn atan2(y: float, x: float) -> float:
+    return math.atan2(y, x)
+
+# Rounding functions
+fn floor(x: float) -> float:
+    return math.floor(x)
+
+fn ceil(x: float) -> float:
+    return math.ceil(x)
+
+fn round(x: float) -> float:
+    return math.round(x)
+
+# Clamp value between min and max
+fn clamp(x: float, min: float, max: float) -> float:
+    return math.clamp(x, min, max)
+
+# Min/Max
+fn min(a: float, b: float) -> float:
+    return math.min(a, b)
+
+fn max(a: float, b: float) -> float:
+    return math.max(a, b)
+
+# Hypotenuse
+fn hypot(x: float, y: float) -> float:
+    return math.hypot(x, y)
+
+# Linear interpolation
+fn lerp(a: float, b: float, t: float) -> float:
+    return math.lerp(a, b, t)
+
+# Random functions (prefer rand module)
+fn randf() -> float:
+    return math.randf()
+
+fn randi(max: int) -> int:
+    return math.randi(max)
+
+# Statistical functions
+fn mean(arr: list<float>, len: int) -> float:
+    return math.mean(arr, len)
+
+fn std(arr: list<float>, len: int) -> float:
+    return math.std(arr, len)
+
+fn sum(arr: list<float>, len: int) -> float:
+    return math.sum(arr, len)
+

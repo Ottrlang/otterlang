@@ -1,0 +1,32 @@
+# 🦦 OtterLang Runtime Module - Introspection and Performance
+# Provides runtime information, statistics, and memory management
+
+# Get number of active tasks/threads
+fn gos() -> int:
+    return runtime.gos()
+
+# Get CPU core count
+fn cpu_count() -> int:
+    return runtime.cpu_count()
+
+# Get current heap memory usage in bytes
+fn memory() -> int:
+    return runtime.memory()
+
+# Trigger garbage collection (no-op in Rust, but provided for API compatibility)
+fn collect_garbage():
+    runtime.collect_garbage()
+
+# Get runtime statistics as JSON string
+fn stats() -> string:
+    stats_json = runtime.stats()
+    return stats_json
+
+# Get OtterLang runtime version
+fn version() -> string:
+    version_str = runtime.version()
+    return version_str
+
+# Free a string returned by runtime functions
+fn free_string(ptr: string):
+    runtime.free(ptr)

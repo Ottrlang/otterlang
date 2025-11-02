@@ -1,11 +1,11 @@
 // In-memory Optimization System
+pub mod call_graph;
 pub mod inliner;
 pub mod reoptimizer;
-pub mod call_graph;
 
+pub use call_graph::CallGraph;
 pub use inliner::Inliner;
 pub use reoptimizer::Reoptimizer;
-pub use call_graph::CallGraph;
 
 /// Optimization context for hot functions
 pub struct OptimizationContext {
@@ -21,4 +21,3 @@ impl OptimizationContext {
         }
     }
 }
-

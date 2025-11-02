@@ -1,9 +1,0 @@
-fn main():
-    x = 10
-    y = 3
-    flag = true
-
-    print(f"Arithmetic: {x} + {y} = {x + y}")
-    print(f"Comparison: {x} > {y} = {x > y}")
-    print(f"Boolean: {flag}")
-    print(f"Complex: ({x} * {y}) / {y} = {(x * y) / y}")

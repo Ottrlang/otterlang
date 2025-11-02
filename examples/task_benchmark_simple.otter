@@ -1,0 +1,13 @@
+fn main:
+    print("🦦 OtterLang Performance Test")
+
+    # Simple computation test without FFI dependencies
+    result = 0.0
+    for i in 0..100.0:
+        val = i * 2.0
+        x = val + (val / 2.0)
+        result = result + (x * x)
+
+    print("✅ Computation complete!")
+    print(f"Result: {result}")
+

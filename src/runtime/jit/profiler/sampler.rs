@@ -48,4 +48,3 @@ impl Default for Sampler {
         Self::new()
     }
 }
-

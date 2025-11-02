@@ -1,4 +1,4 @@
-use crate::ast::nodes::{Function, Block, Expr, Statement};
+use crate::ast::nodes::{Block, Expr, Function, Statement};
 
 /// Inlines function calls for optimization
 pub struct Inliner {
@@ -18,7 +18,12 @@ impl Inliner {
         callee_size <= self.max_inline_size
     }
 
-    pub fn inline_call(&self, caller: &mut Function, callee: &Function, call_expr: &Expr) -> Result<(), String> {
+    pub fn inline_call(
+        &self,
+        caller: &mut Function,
+        callee: &Function,
+        call_expr: &Expr,
+    ) -> Result<(), String> {
         // Extract arguments from call expression
         let args = if let Expr::Call { args, .. } = call_expr {
             args.clone()
@@ -40,7 +45,12 @@ impl Inliner {
         Ok(())
     }
 
-    fn substitute_parameters(&self, block: &mut Block, params: &[crate::ast::nodes::Param], args: &[Expr]) {
+    fn substitute_parameters(
+        &self,
+        block: &mut Block,
+        params: &[crate::ast::nodes::Param],
+        args: &[Expr],
+    ) {
         // Simplified parameter substitution
         // Full implementation would need proper variable renaming to avoid conflicts
         for stmt in &mut block.statements {
@@ -48,7 +58,12 @@ impl Inliner {
         }
     }
 
-    fn substitute_in_stmt(&self, stmt: &mut Statement, params: &[crate::ast::nodes::Param], args: &[Expr]) {
+    fn substitute_in_stmt(
+        &self,
+        stmt: &mut Statement,
+        params: &[crate::ast::nodes::Param],
+        args: &[Expr],
+    ) {
         // Implementation would traverse AST and replace parameter references
         // This is a placeholder for the full implementation
         match stmt {
@@ -69,7 +84,12 @@ impl Inliner {
 
     fn count_in_stmt(&self, stmt: &Statement) -> usize {
         match stmt {
-            Statement::If { then_block, elif_blocks, else_block, .. } => {
+            Statement::If {
+                then_block,
+                elif_blocks,
+                else_block,
+                ..
+            } => {
                 let mut count = 1;
                 count += self.count_statements(then_block);
                 for (_, block) in elif_blocks {
@@ -93,4 +113,3 @@ impl Default for Inliner {
         Self::new()
     }
 }
-
