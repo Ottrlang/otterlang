@@ -270,6 +270,24 @@ otterlang/
 - ✅ Code formatting
 - ✅ Memory profiling
 
+## Performance Benchmarks
+
+We've benchmarked OtterLang against C and Rust using the [Leibniz formula for π](https://en.wikipedia.org/wiki/Leibniz_formula_for_%CF%80), calculating π with 10,000,000 iterations. All implementations are compiled with optimization flags (`-O3` for C, `-O` for Rust, `--release` for OtterLang).
+
+### Benchmark Results
+
+| Language | Compiler | Avg Time (5 runs) | 
+|----------|----------|-------------------|
+| C | `gcc -O3` | ~0.007s |
+| Rust | `rustc -O` | ~0.009s |
+| OtterLang | `otter --release` | *Coming soon* |
+
+*Note: The OtterLang benchmark implementation is available in `examples/pi_leibniz.otter`. Currently experiencing a type inference issue that needs to be resolved.*
+
+### Example Implementations
+
+See `examples/pi_leibniz.c`, `examples/pi_leibniz.rs`, and `examples/pi_leibniz.otter` for the complete implementations.
+
 ## Current Limitations
 
 ⚠️ **Early Access Release** - OtterLang is experimental and subject to change.
