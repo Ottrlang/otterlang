@@ -199,7 +199,7 @@ impl From<&Type> for TypeInfo {
                 "bool" => TypeInfo::Bool,
                 "i32" => TypeInfo::I32,
                 "i64" => TypeInfo::I64,
-                "f64" => TypeInfo::F64,
+                "f64" | "float" => TypeInfo::F64,
                 "str" => TypeInfo::Str,
                 _ => TypeInfo::Generic {
                     base: name.clone(),
