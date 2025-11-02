@@ -26,9 +26,11 @@ jobs:
       - name: Install LLVM 15 (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          brew install llvm@15
+          brew install llvm@15 || brew reinstall llvm@15
           echo "LLVM_SYS_150_PREFIX=$(brew --prefix llvm@15)" >> $GITHUB_ENV
           echo "$(brew --prefix llvm@15)/bin" >> $GITHUB_PATH
+        env:
+          HOMEBREW_NO_INSTALL_CLEANUP: 1
       
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
@@ -42,17 +44,23 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
       
       - name: Build
+        env:
+          LLVM_SYS_150_PREFIX: ${{ env.LLVM_SYS_150_PREFIX }}
         run: cargo build --verbose
       
       - name: Run tests
+        env:
+          LLVM_SYS_150_PREFIX: ${{ env.LLVM_SYS_150_PREFIX }}
         run: cargo test --verbose
       
       - name: Build examples
+        env:
+          LLVM_SYS_150_PREFIX: ${{ env.LLVM_SYS_150_PREFIX }}
         run: |
           cargo build --release
           for example in examples/*.otter; do
