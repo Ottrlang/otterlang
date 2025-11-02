@@ -2,8 +2,8 @@
 
 <p>
     <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/jonathanmagambo/otterlang/main/image.png" width="400">
-      <img src="https://raw.githubusercontent.com/jonathanmagambo/otterlang/main/image.png" width="400" alt="OtterLang Logo" />
+      <source media="(prefers-color-scheme: dark)" srcset="https://github.com/jonathanmagambo/otterlang/blob/main/image.png?raw=true" width="400">
+      <img src="https://github.com/jonathanmagambo/otterlang/blob/main/image.png?raw=true" width="400" alt="OtterLang Logo" />
     </picture>
     <br>
     <strong>Simple like Python, fast with Rust, and everything in between.</strong>
