@@ -1,10 +1,10 @@
 fn calculate_pi(iterations: float) -> float:
-    pi = 0.0
-    sign = 1.0
+    let pi = 0.0
+    let sign = 1.0
     
-    k = 0.0
+    let k = 0.0
     while k < iterations:
-        denominator = 2.0 * k + 1.0
+        let denominator = 2.0 * k + 1.0
         pi = pi + (sign / denominator)
         sign = -sign
         k = k + 1.0
@@ -12,9 +12,9 @@ fn calculate_pi(iterations: float) -> float:
     return pi * 4.0
 
 fn main:
-    iterations = 10000000.0
-    pi = calculate_pi(iterations)
-    pi_str = f"{pi}"
+    let iterations = 10000000.0
+    let pi = calculate_pi(iterations)
+    let pi_str = f"{pi}"
     print("π ≈ ")
     print(pi_str)
     print("\n")
