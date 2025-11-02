@@ -196,12 +196,19 @@ pub fn build_executable(
     };
     
     // Get the normalized triple string for LLVM
-    let triple_str = if target_triple.arch == "arm64" {
+    let triple_str = if target_triple.arch == "aarch64" && target_triple.os == "darwin" {
         "aarch64-apple-darwin".to_string()
     } else if target_triple.arch == "x86_64" && target_triple.os == "darwin" {
         "x86_64-apple-darwin".to_string()
     } else {
         target_triple.to_llvm_triple()
+    };
+    
+    // Debug: Ensure we're using aarch64 for macOS ARM
+    let triple_str = if triple_str == "arm64-apple-darwin" {
+        "aarch64-apple-darwin".to_string()
+    } else {
+        triple_str
     };
     
     // Create inkwell TargetTriple directly
@@ -380,12 +387,19 @@ pub fn build_shared_library(
     };
     
     // Get the normalized triple string for LLVM
-    let triple_str = if target_triple.arch == "arm64" {
+    let triple_str = if target_triple.arch == "aarch64" && target_triple.os == "darwin" {
         "aarch64-apple-darwin".to_string()
     } else if target_triple.arch == "x86_64" && target_triple.os == "darwin" {
         "x86_64-apple-darwin".to_string()
     } else {
         target_triple.to_llvm_triple()
+    };
+    
+    // Debug: Ensure we're using aarch64 for macOS ARM
+    let triple_str = if triple_str == "arm64-apple-darwin" {
+        "aarch64-apple-darwin".to_string()
+    } else {
+        triple_str
     };
     
     // Create inkwell TargetTriple directly

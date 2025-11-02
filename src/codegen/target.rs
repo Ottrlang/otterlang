@@ -49,29 +49,25 @@ impl TargetTriple {
             }
         }
 
-        let (os_base, os_suffix) = raw_os.split_at(split_index);
+        let (os_base, _os_suffix) = raw_os.split_at(split_index);
         let os = if os_base.is_empty() {
             raw_os.to_string()
         } else {
             os_base.to_string()
         };
 
-        let mut extra_parts: Vec<String> = Vec::new();
-        if os == "darwin" {
-            extra_parts.push("macosx11.0.0".to_string());
-        } else if !os_suffix.trim_matches('.').is_empty() {
-            let trimmed = os_suffix.trim_start_matches('-').trim_start_matches('.');
-            if !trimmed.is_empty() {
-                extra_parts.push(trimmed.to_string());
+        // Only include parts[3..] as env (e.g., "gnu", "musl", "eabi")
+        // Do NOT inject version suffixes or darwin-specific strings
+        let env = if parts.len() > 3 {
+            let env_str = parts[3..].join("-");
+            // Filter out empty or invalid env strings
+            if env_str.is_empty() {
+                None
+            } else {
+                Some(env_str)
             }
-        }
-        if parts.len() > 3 {
-            extra_parts.push(parts[3..].join("-"));
-        }
-        let env = if extra_parts.is_empty() {
-            None
         } else {
-            Some(extra_parts.into_iter().filter(|s| !s.is_empty()).collect::<Vec<_>>().join("-"))
+            None
         };
 
         Ok(Self { arch, vendor, os, env })
@@ -692,9 +688,18 @@ impl Default for TargetTriple {
         // Get native target from LLVM
         let llvm_triple = inkwell::targets::TargetMachine::get_default_triple();
         let triple_str = llvm_triple.to_string();
-        Self::parse(&triple_str).unwrap_or_else(|_| {
-            Self::new("x86_64", "unknown", "linux", Some("gnu"))
-        })
+        
+        // Normalize common macOS triples
+        // Convert "arm64" to "aarch64" for LLVM compatibility
+        if triple_str.starts_with("arm64-apple-darwin") {
+            Self::new("aarch64", "apple", "darwin", None::<String>)
+        } else if triple_str.starts_with("x86_64-apple-darwin") {
+            Self::new("x86_64", "apple", "darwin", None::<String>)
+        } else {
+            Self::parse(&triple_str).unwrap_or_else(|_| {
+                Self::new("x86_64", "unknown", "linux", Some("gnu"))
+            })
+        }
     }
 }
 
