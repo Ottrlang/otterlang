@@ -1,4 +1,4 @@
-fn calculate_pi(iterations: float) -> float:
+fn calculate_pi(iterations: f64) -> f64:
     let pi = 0.0
     let sign = 1.0
     
