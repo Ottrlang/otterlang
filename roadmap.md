@@ -28,6 +28,9 @@ This roadmap outlines major areas of investment and their intended scope. Items 
 - Per-function JIT
   - Julia-style per-function JIT for hot paths
   - Tiered execution (interp/JIT/native) with profiling feedback
+  - Manual JIT control for predictable AOT performance with optional dynamic compilation
+    - Explicit `jit` annotation for functions requiring JIT compilation
+    - Allows predictable ahead-of-time speed for most code with JIT available for specific dynamic tasks
 - Live module loading
   - Reloadable modules for REPL and long-lived processes
   - Stable ABI for safe hot-swapping within a process
@@ -51,6 +54,33 @@ This roadmap outlines major areas of investment and their intended scope. Items 
 - WASM target for safe embedding
   - Compile OtterLang to WebAssembly for browser and WASM runtimes
   - Sandboxed execution in WASM environments
+
+### Milestone 2.6: Embedded Development Features
+- Strong type aliases (newtype pattern)
+  - Create distinct types from base types (e.g., `UserId` from `int`, `FileDescriptor` from `int`)
+  - Compile-time type checking prevents mixing semantically different types
+  - Zero-cost abstraction: no runtime overhead, purely compile-time safety
+  - Syntax: `type UserId = int` creates a strong alias (distinct from `int`)
+- Defer statement for resource management
+  - `defer` keyword ensures cleanup code runs when function exits (normal return or error)
+  - Simplifies resource management (file handles, database connections, locks)
+  - Multiple defer statements execute in reverse order (LIFO)
+  - Complements error handling by guaranteeing cleanup even on early returns
+- Critical section blocks
+  - Built-in atomic block syntax for thread/coroutine-safe code sections
+  - Ensures code runs without interruption for shared data structure updates
+  - Prevents common concurrency bugs with clear, explicit syntax
+  - Compiler-enforced synchronization guarantees
+- Memory section control
+  - Syntax to explicitly control variable placement in memory sections
+  - Place large constant lookup tables in read-only sections (`.rodata`) instead of RAM
+  - Support for `.data`, `.bss`, `.rodata`, and custom linker sections
+  - Critical for embedded systems with limited RAM and strict memory constraints
+- Cleaner bit manipulation syntax
+  - Built-in syntax for common bit operations (set, clear, toggle, test bits)
+  - Replace error-prone patterns like `CONFIG_REGISTER |= (1 << 5)` with readable syntax
+  - Type-safe bit field operations with compile-time validation
+  - Improves readability and reduces bugs in low-level embedded code
 
 ### Milestone 3: Tooling and Developer Experience
 - Testing framework
@@ -96,6 +126,12 @@ This roadmap outlines major areas of investment and their intended scope. Items 
   - OtterLang code runs in isolated environment with resource limits
   - Plugin system successfully loads and executes OtterLang scripts in host applications
   - WASM-compiled OtterLang runs in browser with sandboxed I/O
+- Embedded development features
+  - Strong type aliases prevent type confusion at compile time (e.g., `UserId` ≠ `ProductId` even if both are `int`)
+  - `defer` statements guarantee resource cleanup even on error paths
+  - Critical section blocks provide thread-safe code execution
+  - Memory section control allows explicit placement of data in read-only sections
+  - Bit manipulation syntax is readable and type-safe (no more `|= (1 << 5)` patterns)
 - Testing
   - `otter test` discovers and runs tests, returning non-zero on failure
   - Assertions report clear diffs and spans
