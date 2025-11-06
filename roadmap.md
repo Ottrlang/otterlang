@@ -46,9 +46,8 @@ This roadmap outlines major areas of investment and their intended scope. Items 
   - Safe Rust API for creating and managing VM instances
   - Callback system for host-to-guest and guest-to-host communication
 - Game engine integration
-  - Godot plugin/GDExtension support
-  - Unity native plugin compatibility
-  - Unreal Engine integration via C API
+  - Plugin system for embedding in game engines and applications
+  - Native plugin compatibility via C API
 - WASM target for safe embedding
   - Compile OtterLang to WebAssembly for browser and WASM runtimes
   - Sandboxed execution in WASM environments
@@ -95,7 +94,7 @@ This roadmap outlines major areas of investment and their intended scope. Items 
 - Embeddable runtime
   - VM can be instantiated from Rust with configurable sandbox permissions
   - OtterLang code runs in isolated environment with resource limits
-  - Godot plugin successfully loads and executes OtterLang scripts
+  - Plugin system successfully loads and executes OtterLang scripts in host applications
   - WASM-compiled OtterLang runs in browser with sandboxed I/O
 - Testing
   - `otter test` discovers and runs tests, returning non-zero on failure
