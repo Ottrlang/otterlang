@@ -58,9 +58,9 @@
 
             RUST_SRC_PATH = "${rustToolchain}/lib/rustlib/src/rust/library";
 
-            LLVM_SYS_170_PREFIX = "${llvm_bin}";
-            LD_LIBRARY_PATH = lib.optionalString (hasInfix "linux" system) "${llvm_bin}/lib:${llvm_libs}/lib";
-            LIBRARY_PATH = lib.optionalString (hasInfix "linux" system) "${llvm_bin}/lib:${llvm_libs}/lib";
+            LLVM_SYS_170_PREFIX = "${llvmPackages}";
+            LD_LIBRARY_PATH = "${llvmPackages}/lib";
+            LIBRARY_PATH = "${llvmPackages}/lib";
 
             RUSTFLAGS =
               "-Zshare-generics=y" + lib.optionalString (hasInfix "linux" system) " -Clink-arg=-fuse-ld=mold";
