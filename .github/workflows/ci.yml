@@ -96,40 +96,24 @@ jobs:
             ${{ runner.os }}-cargo-
       
       - name: Build
-        env:
-          LLVM_SYS_181_PREFIX: ${{ env.LLVM_SYS_181_PREFIX }}
-          LD_LIBRARY_PATH: ${{ env.LD_LIBRARY_PATH }}
-          LIBRARY_PATH: ${{ env.LIBRARY_PATH }}
         run: cargo build --verbose
         if: ${{ matrix.os != 'windows-latest' }}
       
       - name: Build (Windows)
         if: ${{ matrix.os == 'windows-latest' }}
-        env:
-          LLVM_SYS_181_PREFIX: ${{ env.LLVM_SYS_181_PREFIX }}
         shell: pwsh
         run: cargo build --verbose
       
       - name: Run tests
-        env:
-          LLVM_SYS_181_PREFIX: ${{ env.LLVM_SYS_181_PREFIX }}
-          LD_LIBRARY_PATH: ${{ env.LD_LIBRARY_PATH }}
-          LIBRARY_PATH: ${{ env.LIBRARY_PATH }}
         run: cargo test --verbose
         if: ${{ matrix.os != 'windows-latest' }}
       
       - name: Run tests (Windows)
         if: ${{ matrix.os == 'windows-latest' }}
-        env:
-          LLVM_SYS_181_PREFIX: ${{ env.LLVM_SYS_181_PREFIX }}
         shell: pwsh
         run: cargo test --verbose
       
       - name: Build examples
-        env:
-          LLVM_SYS_181_PREFIX: ${{ env.LLVM_SYS_181_PREFIX }}
-          LD_LIBRARY_PATH: ${{ env.LD_LIBRARY_PATH }}
-          LIBRARY_PATH: ${{ env.LIBRARY_PATH }}
         run: |
           cargo build --release
           find examples -name "*.ot" -type f | while read -r example; do
@@ -139,8 +123,6 @@ jobs:
       
       - name: Build examples (Windows)
         if: ${{ matrix.os == 'windows-latest' }}
-        env:
-          LLVM_SYS_181_PREFIX: ${{ env.LLVM_SYS_181_PREFIX }}
         shell: pwsh
         run: |
           cargo build --release
