@@ -53,7 +53,7 @@
             ];
 
             RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
-            LLVM_SYS_180_PREFIX="${llvm.llvm}";
+            LLVM_SYS_181_PREFIX="${llvm.llvm}";
 
             RUSTFLAGS =
               "-Zshare-generics=y" + lib.optionalString (hasInfix "linux" system) " -Clink-arg=-fuse-ld=mold";

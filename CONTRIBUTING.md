@@ -20,8 +20,8 @@ cargo build --release
    **macOS:**
    ```bash
    brew install llvm@18
-   export LLVM_SYS_180_PREFIX=$(brew --prefix llvm@18)
-   export PATH="$LLVM_SYS_180_PREFIX/bin:$PATH"
+   export LLVM_SYS_181_PREFIX=$(brew --prefix llvm@18)
+   export PATH="$LLVM_SYS_181_PREFIX/bin:$PATH"
    rustup toolchain install nightly
    rustup default nightly
    cargo build --release
@@ -30,7 +30,7 @@ cargo build --release
    **Ubuntu/Debian:**
    ```bash
    sudo apt-get install -y llvm-18 llvm-18-dev clang-18
-   export LLVM_SYS_180_PREFIX=/usr/lib/llvm-18
+   export LLVM_SYS_181_PREFIX=/usr/lib/llvm-18
    rustup toolchain install nightly
    rustup default nightly
    cargo build --release
@@ -44,8 +44,8 @@ cargo build --release
    # choco install llvm -y
 
    # Set environment variables (adjust path if LLVM is installed elsewhere)
-   $env:LLVM_SYS_180_PREFIX = "C:\Program Files\LLVM"
-   $env:Path = "$env:LLVM_SYS_180_PREFIX\bin;$env:Path"
+   $env:LLVM_SYS_181_PREFIX = "C:\Program Files\LLVM"
+   $env:Path = "$env:LLVM_SYS_181_PREFIX\bin;$env:Path"
 
    # Install Rust nightly
    rustup toolchain install nightly
