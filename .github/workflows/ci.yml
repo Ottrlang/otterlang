@@ -18,29 +18,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Install LLVM 15
+      - name: Install LLVM 18
         if: matrix.os == 'ubuntu-latest'
         run: |
           sudo apt-get update
-          sudo apt-get install -y llvm-15 llvm-15-dev clang-15 || true
+          sudo apt-get install -y llvm-18 llvm-18-dev clang-18 || true
           # Try to install Polly if available (may not exist in all repos)
-          sudo apt-get install -y libpolly-15-dev 2>/dev/null || echo "Polly not available in repo"
-          echo "LLVM_SYS_150_PREFIX=/usr/lib/llvm-15" >> $GITHUB_ENV
-          echo "LD_LIBRARY_PATH=/usr/lib/llvm-15/lib:${LD_LIBRARY_PATH:-}" >> $GITHUB_ENV
+          sudo apt-get install -y libpolly-18-dev 2>/dev/null || echo "Polly not available in repo"
+          echo "LLVM_SYS_180_PREFIX=/usr/lib/llvm-18" >> $GITHUB_ENV
+          echo "LD_LIBRARY_PATH=/usr/lib/llvm-18/lib:${LD_LIBRARY_PATH:-}" >> $GITHUB_ENV
           # Set library search path for linker
-          echo "LIBRARY_PATH=/usr/lib/llvm-15/lib:${LIBRARY_PATH:-}" >> $GITHUB_ENV
+          echo "LIBRARY_PATH=/usr/lib/llvm-18/lib:${LIBRARY_PATH:-}" >> $GITHUB_ENV
       
-      - name: Install LLVM 15 (macOS)
+      - name: Install LLVM 18 (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          brew install llvm@15 || brew reinstall llvm@15
-          echo "LLVM_SYS_150_PREFIX=$(brew --prefix llvm@15)" >> $GITHUB_ENV
-          echo "$(brew --prefix llvm@15)/bin" >> $GITHUB_PATH
+          brew install llvm@18 || brew reinstall llvm@18
+          echo "LLVM_SYS_180_PREFIX=$(brew --prefix llvm@18)" >> $GITHUB_ENV
+          echo "$(brew --prefix llvm@18)/bin" >> $GITHUB_PATH
         env:
           HOMEBREW_NO_INSTALL_CLEANUP: 1
       
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@nightly
       
       - name: Cache Cargo dependencies
         uses: actions/cache@v4
@@ -57,21 +57,21 @@ jobs:
       
       - name: Build
         env:
-          LLVM_SYS_150_PREFIX: ${{ env.LLVM_SYS_150_PREFIX }}
+          LLVM_SYS_180_PREFIX: ${{ env.LLVM_SYS_180_PREFIX }}
           LD_LIBRARY_PATH: ${{ env.LD_LIBRARY_PATH }}
           LIBRARY_PATH: ${{ env.LIBRARY_PATH }}
         run: cargo build --verbose
       
       - name: Run tests
         env:
-          LLVM_SYS_150_PREFIX: ${{ env.LLVM_SYS_150_PREFIX }}
+          LLVM_SYS_180_PREFIX: ${{ env.LLVM_SYS_180_PREFIX }}
           LD_LIBRARY_PATH: ${{ env.LD_LIBRARY_PATH }}
           LIBRARY_PATH: ${{ env.LIBRARY_PATH }}
         run: cargo test --verbose
       
       - name: Build examples
         env:
-          LLVM_SYS_150_PREFIX: ${{ env.LLVM_SYS_150_PREFIX }}
+          LLVM_SYS_180_PREFIX: ${{ env.LLVM_SYS_180_PREFIX }}
           LD_LIBRARY_PATH: ${{ env.LD_LIBRARY_PATH }}
           LIBRARY_PATH: ${{ env.LIBRARY_PATH }}
         run: |
