@@ -182,81 +182,16 @@ This milestone focuses on advanced compile-time optimizations that enable zero-c
 - Compile-time evaluation
   - `@compile` functions execute during compilation and produce no runtime code
   - Generics work as compile-time functions (e.g., `List[T]` expands at compile time)
-  - Blue expressions are fully evaluated during compilation
+  - Compile-time evaluable expressions are fully evaluated during compilation
   - Static dispatch resolves method calls at compile time for known types
   - Module freezing prevents mutation of globals after initialization
   - Type-checked code has runtime type safety guarantees
 
 ---
 
-## Comparative Analysis: OtterLang vs SPy
+## Key Improvements and Enhancements
 
-This section compares OtterLang with SPy (a statically typed variant of Python) to identify strengths, weaknesses, and opportunities for improvement. Both languages aim for high performance while maintaining developer ergonomics, but take different approaches.
-
-### What SPy Does Better
-
-1. **Compile-Time Evaluation and Metaprogramming**
-   - **@blue functions**: SPy's compile-time evaluation system allows metaprogramming in the same language
-   - **Redshifting (blue/red evaluation)**: Automatic partial evaluation of statically known code
-   - **Generics as @blue functions**: Type parameters are just compile-time function calls
-   - **Zero-cost abstractions**: Decorators, descriptor protocol, `__getattr__` without runtime overhead
-   - **Insight**: OtterLang currently has basic constant folding but lacks powerful compile-time evaluation. This could enable zero-cost abstractions and better metaprogramming.
-
-2. **Import-Time vs Runtime Separation**
-   - **World freezing**: After imports, modules and classes become immutable, enabling aggressive optimizations
-   - **Static module resolution**: All imports resolved at compile time
-   - **Insight**: OtterLang could benefit from freezing global constants and module-level data after initialization, allowing better optimization.
-
-3. **Static Dispatch**
-   - **Compile-time method resolution**: Operator overloading and method calls resolved at compile time based on static types
-   - **Opt-in dynamism**: `dynamic` type available when needed, but static by default
-   - **Insight**: OtterLang could implement static dispatch for known types while keeping dynamic dispatch as opt-in.
-
-4. **Type System Soundness**
-   - **Runtime type enforcement**: Types are checked and enforced at runtime, not just by static analysis
-   - **Guaranteed type safety**: If code type-checks, it cannot have type errors at runtime
-   - **Insight**: OtterLang's type system could be enhanced with runtime checks for soundness guarantees.
-
-5. **Python Ecosystem Integration**
-   - **Bidirectional Python interop**: Can import Python libraries and export to CPython
-   - **Insight**: While OtterLang focuses on Rust FFI, Python interop could be valuable for certain use cases.
-
-### What OtterLang Does Better
-
-1. **Transparent Rust FFI**
-   - **Automatic API extraction**: Uses rustdoc to extract APIs without manual bindings
-   - **Memory management**: Automatic handling of Rust types
-   - **Async/await support**: Native support for Rust Futures
-   - **Insight**: This is a unique strength - SPy doesn't have equivalent seamless FFI.
-
-2. **WebAssembly Support**
-   - **Native WASM target**: Already implemented with both `wasm32-unknown-unknown` and `wasm32-wasi`
-   - **Insight**: SPy doesn't mention WASM support - OtterLang has a head start here.
-
-3. **Exception Handling**
-   - **Structured exception system**: `try/except/else/finally` with zero-cost success path
-   - **Type-safe error handling**: Compile-time guarantees about error propagation
-   - **Insight**: More structured than SPy's approach.
-
-4. **Native Compilation**
-   - **Direct LLVM backend**: No interpreter needed for deployment
-   - **Single compilation model**: AOT compilation is the primary mode
-   - **Insight**: Simpler model than SPy's interpreter + compiler dual approach.
-
-5. **Embedded Systems Focus**
-   - **Memory section control**: Explicit control over data placement
-   - **Bit manipulation syntax**: Clean syntax for low-level operations
-   - **Strong type aliases**: Newtype pattern for type safety
-   - **Insight**: OtterLang is better positioned for embedded development.
-
-6. **JIT Capabilities**
-   - **Per-function JIT**: Planned Julia-style JIT for hot paths
-   - **Tiered execution**: Interpreter/JIT/native with profiling feedback
-   - **Insight**: More flexible execution model than SPy's AOT-only approach.
-
-### Opportunities for OtterLang
-
-Key improvements to make OtterLang more competitive and powerful:
+Areas where OtterLang can be enhanced to achieve better performance, type safety, and developer experience:
 
 1. **Compile-Time Evaluation System**
    - Add `@compile` or `@const` annotations for compile-time evaluation
@@ -293,7 +228,6 @@ Key improvements to make OtterLang more competitive and powerful:
 
 ### Out of Scope (for now)
 - Distributed runtime
-- Python ecosystem integration (focus remains on Rust ecosystem)
 - Full interpreter mode (AOT compilation is primary; JIT/interpreter are for specific use cases)
 
 ### Feedback
