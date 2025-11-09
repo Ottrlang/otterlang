@@ -561,6 +561,7 @@ fn expr_parser() -> impl Parser<TokenKind, Expr, Error = Simple<TokenKind>> {
                             .ignore_then(pattern_parser(expr.clone()))
                             .then_ignore(just(TokenKind::Colon))
                             .then_ignore(newline.clone())
+                            .then_ignore(just(TokenKind::Indent))
                             .then(
                                 logical
                                     .clone()
@@ -575,6 +576,7 @@ fn expr_parser() -> impl Parser<TokenKind, Expr, Error = Simple<TokenKind>> {
                                             .unwrap_or_else(|| Expr::Literal(Literal::Unit))
                                     }),
                             )
+                            .then_ignore(just(TokenKind::Dedent))
                             .map(|(pattern, body)| MatchArm {
                                 pattern,
                                 guard: None,

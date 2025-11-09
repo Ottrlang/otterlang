@@ -6,22 +6,19 @@ def divide(x: float, y: float) -> Result<float, str>:
     return Result.Ok(x / y)
 
 def describe(value: Option<float>) -> str:
-    let message = ""
-    match value:
+    return match value:
         case Option.Some(result):
-            message = f"Result: {result}"
+            f"Result: {result}"
         case Option.None:
-            message = "No value provided"
-    return message
+            "No value provided"
 
 def main():
     let sample = divide(10.0, 2.0)
-    let status = ""
-    match sample:
+    let status = match sample:
         case Result.Ok(val):
-            status = f"Ok: {val}"
+            f"Ok: {val}"
         case Result.Err(msg):
-            status = f"Error: {msg}"
+            f"Error: {msg}"
     print(status)
 
     let maybe = Option.Some(42.0)
