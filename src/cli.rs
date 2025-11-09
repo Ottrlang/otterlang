@@ -8,7 +8,6 @@ use clap::{Parser, Subcommand};
 use colored::Colorize;
 use tracing::{debug, info, warn};
 
-use crate::cache::{CacheBuildOptions, CacheEntry, CacheManager, CacheMetadata, CompilationInputs};
 use crate::codegen::{
     self, build_executable, BuildArtifact, CodegenOptLevel, CodegenOptions, TargetTriple,
 };
@@ -17,6 +16,7 @@ use crate::parser::{parse, ParserError};
 use crate::runtime::ffi;
 use crate::typecheck::TypeChecker;
 use crate::version::VERSION;
+use cache::{CacheBuildOptions, CacheEntry, CacheManager, CacheMetadata, CompilationInputs};
 use lexer::{tokenize, LexerError};
 use utils::errors::{emit_diagnostics, Diagnostic};
 use utils::logger;

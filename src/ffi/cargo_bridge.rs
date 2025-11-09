@@ -5,7 +5,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use libloading::library_filename;
 use tracing::debug;
 
-use crate::cache::path::cache_root;
+use cache::path::cache_root;
 
 use super::metadata::{BridgeMetadata, CrateSpec};
 use super::rust_stubgen::{RustStubGenerator, StubSource};

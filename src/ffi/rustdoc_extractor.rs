@@ -6,7 +6,7 @@ use serde::Deserialize;
 
 use super::metadata::DependencyConfig;
 use super::metadata::{CrateSpec, FnSig, PublicItem, RustPath, RustTypeRef};
-use crate::cache::path::cache_root;
+use cache::path::cache_root;
 
 /// Generate rustdoc JSON for a dependency crate by creating a minimal cargo
 /// project and invoking cargo doc with JSON output enabled. The resulting JSON

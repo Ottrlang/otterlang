@@ -12,9 +12,9 @@ use once_cell::sync::OnceCell;
 use sha1::{Digest, Sha1};
 use tracing::debug;
 
-use crate::cache::path::cache_root;
 use crate::runtime::ffi_api;
 use crate::runtime::symbol_registry::{FfiFunction, FfiSignature, FfiType, SymbolRegistry};
+use cache::path::cache_root;
 
 #[derive(Clone, Copy)]
 pub struct SymbolProvider {
