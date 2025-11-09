@@ -434,7 +434,7 @@ impl Formatter {
                     })
                     .collect::<Vec<_>>()
                     .join(", ");
-                let ret_str = if let Some(ref ret_ty_val) = ret_ty {
+                let ret_str = if let Some(ret_ty_val) = ret_ty {
                     format!(" -> {}", self.format_type(ret_ty_val))
                 } else {
                     String::new()
