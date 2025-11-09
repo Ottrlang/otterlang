@@ -31,6 +31,8 @@ impl ModulePath {
             }
         } else if let Some(rest) = module.strip_prefix("otter.") {
             Ok(ModulePath::Stdlib(rest.to_string()))
+        } else if let Some(rest) = module.strip_prefix("otter/") {
+            Ok(ModulePath::Stdlib(rest.to_string()))
         } else if module.starts_with('/') {
             Ok(ModulePath::Absolute(PathBuf::from(module)))
         } else if module.starts_with("./") || module.starts_with("../") {
@@ -273,6 +275,10 @@ mod tests {
 
         // Test dot-stdlib shorthand
         let path = ModulePath::from_string("otter.core", &source_dir).unwrap();
+        assert!(matches!(path, ModulePath::Stdlib(name) if name == "core"));
+
+        // Test slash shorthand
+        let path = ModulePath::from_string("otter/core", &source_dir).unwrap();
         assert!(matches!(path, ModulePath::Stdlib(name) if name == "core"));
     }
 
