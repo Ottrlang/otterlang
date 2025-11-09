@@ -69,5 +69,5 @@ def main():
     print("==========================================")
     let valid_users = process_users()
     print(f"Successfully validated users count: {len(valid_users)}")
-    print()
+    println("")
     api_processing_demo()

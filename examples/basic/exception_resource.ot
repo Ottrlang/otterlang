@@ -44,5 +44,5 @@ def main():
     print("Exception Handling - Resource Management")
     print("========================================")
     demonstrate_finally()
-    print()
+    println("")
     resource_management_demo()

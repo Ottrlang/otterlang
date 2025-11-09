@@ -738,6 +738,7 @@ fn program_parser() -> impl Parser<TokenKind, Program, Error = Simple<TokenKind>
     let path_separator = choice((
         just(TokenKind::Slash).to("/".to_string()),
         just(TokenKind::Colon).to(":".to_string()),
+        just(TokenKind::Dot).to(".".to_string()),
     ));
 
     let module_path = path_segment
