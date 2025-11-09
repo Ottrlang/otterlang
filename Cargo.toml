@@ -31,6 +31,7 @@ utils.path = "crates/utils"
 lexer.path = "crates/lexer"
 cache.path = "crates/cache"
 ffi.path = "crates/ffi"
+fmt.path = "crates/fmt"
 
 anyhow = "1.0"
 tempfile = "3.10"

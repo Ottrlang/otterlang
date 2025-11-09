@@ -1,6 +1,5 @@
 pub mod cli;
 pub mod codegen;
-pub mod fmt;
 pub mod lsp;
 pub mod module;
 pub mod parser;
