@@ -6,11 +6,11 @@ use tower_lsp::jsonrpc::Result;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
 
-use crate::parser::parse;
 use crate::runtime::symbol_registry::SymbolRegistry;
 use crate::typecheck::{TypeChecker, TypeError};
 use common::Span;
 use lexer::{tokenize, LexerError};
+use parser::parse;
 use utils::errors::{Diagnostic as OtterDiagnostic, DiagnosticSeverity as OtterDiagSeverity};
 
 #[derive(Default, Debug)]

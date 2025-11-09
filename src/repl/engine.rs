@@ -3,13 +3,13 @@ use std::io::{self, Write};
 use anyhow::{bail, Context, Result};
 use colored::Colorize;
 
-use crate::parser::parse;
 use crate::runtime::ffi;
 use crate::runtime::jit::executor::JitExecutor;
 use crate::runtime::symbol_registry::SymbolRegistry;
 use crate::typecheck::TypeChecker;
 use ast::nodes::{Expr, Program, Statement};
 use lexer::tokenize;
+use parser::parse;
 
 /// REPL engine that maintains state across evaluations
 pub struct ReplEngine {

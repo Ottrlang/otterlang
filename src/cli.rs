@@ -12,12 +12,12 @@ use crate::codegen::{
     self, build_executable, BuildArtifact, CodegenOptLevel, CodegenOptions, TargetTriple,
 };
 use crate::module::ModuleProcessor;
-use crate::parser::{parse, ParserError};
 use crate::runtime::ffi;
 use crate::typecheck::TypeChecker;
 use crate::version::VERSION;
 use cache::{CacheBuildOptions, CacheEntry, CacheManager, CacheMetadata, CompilationInputs};
 use lexer::{tokenize, LexerError};
+use parser::{parse, ParserError};
 use utils::errors::{emit_diagnostics, Diagnostic};
 use utils::logger;
 use utils::profiler::{PhaseTiming, Profiler};
@@ -594,10 +594,10 @@ fn print_timings(stage: &CompilationStage) {
 }
 
 fn handle_fmt(paths: &[PathBuf]) -> Result<()> {
-    use crate::parser::parse;
     use fmt::Formatter;
     use glob::glob;
     use lexer::tokenize;
+    use parser::parse;
 
     println!("{} Formatting OtterLang files...", "✨".magenta());
 

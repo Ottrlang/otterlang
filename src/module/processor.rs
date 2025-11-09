@@ -186,7 +186,7 @@ mod tests {
         .unwrap();
 
         let tokens = lexer::tokenize(&fs::read_to_string(&main_file).unwrap()).unwrap();
-        let program = crate::parser::parse(&tokens).unwrap();
+        let program = parser::parse(&tokens).unwrap();
 
         let mut processor = ModuleProcessor::new(source_dir.clone(), None);
         let deps = processor.process_imports(&program).unwrap();
