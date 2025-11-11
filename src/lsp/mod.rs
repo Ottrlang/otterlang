@@ -7,7 +7,7 @@ use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
 
 use crate::runtime::symbol_registry::SymbolRegistry;
-use crate::typecheck::{TypeChecker, TypeError, TypeInfo};
+use crate::typecheck::{TypeChecker, TypeError};
 use ast::nodes::{Expr, Program, Statement};
 use common::Span;
 use lexer::{tokenize, LexerError, Token};
@@ -29,6 +29,7 @@ enum SymbolKind {
     Struct,
     Enum,
     TypeAlias,
+    #[allow(dead_code)]
     Method,
 }
 
@@ -172,6 +173,7 @@ impl Backend {
         }
     }
 
+    #[allow(dead_code)]
     async fn document_text(&self, uri: &Url) -> Option<String> {
         let state = self.state.read().await;
         state.documents.get(uri).cloned()
@@ -198,14 +200,14 @@ impl LanguageServer for Backend {
                 references_provider: Some(OneOf::Left(true)),
                 document_symbol_provider: Some(OneOf::Left(true)),
                 workspace_symbol_provider: Some(OneOf::Left(true)),
-                rename_provider: Some(OneOf::Left(RenameOptions {
+                rename_provider: Some(OneOf::Right(RenameOptions {
                     prepare_provider: Some(true),
-                    ..Default::default()
-                })),
-                inlay_hint_provider: Some(OneOf::Left(InlayHintOptions {
-                    resolve_provider: Some(true),
                     work_done_progress_options: Default::default(),
                 })),
+                inlay_hint_provider: Some(OneOf::Right(InlayHintServerCapabilities::Options(InlayHintOptions {
+                    resolve_provider: Some(true),
+                    work_done_progress_options: Default::default(),
+                }))),
                 semantic_tokens_provider: Some(
                     SemanticTokensOptions {
                         legend: SemanticTokensLegend {
@@ -289,36 +291,18 @@ impl LanguageServer for Backend {
 
     async fn goto_type_definition(
         &self,
-        params: GotoTypeDefinitionParams,
-    ) -> Result<Option<GotoTypeDefinitionResponse>> {
+        params: GotoDefinitionParams,
+    ) -> Result<Option<GotoDefinitionResponse>> {
         // For now, same as goto_definition
-        let goto_params = GotoDefinitionParams {
-            text_document_position_params: params.text_document_position_params,
-            work_done_progress_params: Default::default(),
-            partial_result_params: Default::default(),
-        };
-        if let Some(GotoDefinitionResponse::Scalar(loc)) = self.goto_definition(goto_params).await? {
-            Ok(Some(GotoTypeDefinitionResponse::Scalar(loc)))
-        } else {
-            Ok(None)
-        }
+        self.goto_definition(params).await
     }
 
     async fn goto_implementation(
         &self,
-        params: GotoImplementationParams,
-    ) -> Result<Option<GotoImplementationResponse>> {
+        params: GotoDefinitionParams,
+    ) -> Result<Option<GotoDefinitionResponse>> {
         // For now, same as goto_definition
-        let goto_params = GotoDefinitionParams {
-            text_document_position_params: params.text_document_position_params,
-            work_done_progress_params: Default::default(),
-            partial_result_params: Default::default(),
-        };
-        if let Some(GotoDefinitionResponse::Scalar(loc)) = self.goto_definition(goto_params).await? {
-            Ok(Some(GotoImplementationResponse::Scalar(loc)))
-        } else {
-            Ok(None)
-        }
+        self.goto_definition(params).await
     }
 
     async fn references(&self, params: ReferenceParams) -> Result<Option<Vec<Location>>> {
@@ -375,15 +359,16 @@ impl LanguageServer for Backend {
             let mut symbols = Vec::new();
             for (name, info) in symbol_table.all_symbols() {
                 let kind = match info.kind {
-                    SymbolKind::Function => SymbolKind::FUNCTION,
-                    SymbolKind::Variable => SymbolKind::VARIABLE,
-                    SymbolKind::Parameter => SymbolKind::PARAMETER,
-                    SymbolKind::Struct => SymbolKind::STRUCT,
-                    SymbolKind::Enum => SymbolKind::ENUM,
-                    SymbolKind::TypeAlias => SymbolKind::TYPE_PARAMETER,
-                    SymbolKind::Method => SymbolKind::METHOD,
+                    SymbolKind::Function => tower_lsp::lsp_types::SymbolKind::FUNCTION,
+                    SymbolKind::Variable => tower_lsp::lsp_types::SymbolKind::VARIABLE,
+                    SymbolKind::Parameter => tower_lsp::lsp_types::SymbolKind::VARIABLE,
+                    SymbolKind::Struct => tower_lsp::lsp_types::SymbolKind::STRUCT,
+                    SymbolKind::Enum => tower_lsp::lsp_types::SymbolKind::ENUM,
+                    SymbolKind::TypeAlias => tower_lsp::lsp_types::SymbolKind::TYPE_PARAMETER,
+                    SymbolKind::Method => tower_lsp::lsp_types::SymbolKind::METHOD,
                 };
-                symbols.push(DocumentSymbol {
+                #[allow(deprecated)]
+                let symbol = DocumentSymbol {
                     name: name.clone(),
                     detail: info.ty.clone(),
                     kind,
@@ -392,7 +377,8 @@ impl LanguageServer for Backend {
                     children: None,
                     deprecated: None,
                     tags: None,
-                });
+                };
+                symbols.push(symbol);
             }
             return Ok(Some(DocumentSymbolResponse::Nested(symbols)));
         }
@@ -413,15 +399,16 @@ impl LanguageServer for Backend {
                 for (name, info) in symbol_table.all_symbols() {
                     if name.to_lowercase().contains(&query) {
                         let kind = match info.kind {
-                            SymbolKind::Function => SymbolKind::FUNCTION,
-                            SymbolKind::Variable => SymbolKind::VARIABLE,
-                            SymbolKind::Parameter => SymbolKind::PARAMETER,
-                            SymbolKind::Struct => SymbolKind::STRUCT,
-                            SymbolKind::Enum => SymbolKind::ENUM,
-                            SymbolKind::TypeAlias => SymbolKind::TYPE_PARAMETER,
-                            SymbolKind::Method => SymbolKind::METHOD,
+                            SymbolKind::Function => tower_lsp::lsp_types::SymbolKind::FUNCTION,
+                            SymbolKind::Variable => tower_lsp::lsp_types::SymbolKind::VARIABLE,
+                            SymbolKind::Parameter => tower_lsp::lsp_types::SymbolKind::VARIABLE,
+                            SymbolKind::Struct => tower_lsp::lsp_types::SymbolKind::STRUCT,
+                            SymbolKind::Enum => tower_lsp::lsp_types::SymbolKind::ENUM,
+                            SymbolKind::TypeAlias => tower_lsp::lsp_types::SymbolKind::TYPE_PARAMETER,
+                            SymbolKind::Method => tower_lsp::lsp_types::SymbolKind::METHOD,
                         };
-                        results.push(SymbolInformation {
+                        #[allow(deprecated)]
+                        let info = SymbolInformation {
                             name: name.clone(),
                             kind,
                             location: Location {
@@ -431,7 +418,8 @@ impl LanguageServer for Backend {
                             container_name: None,
                             deprecated: None,
                             tags: None,
-                        });
+                        };
+                        results.push(info);
                     }
                 }
             }
@@ -515,10 +503,10 @@ impl LanguageServer for Backend {
                         .unwrap_or_else(|| kind_str.to_string());
                     
                     let contents = HoverContents::Scalar(MarkedString::String(detail));
-                    return Ok(Some(Hover {
-                        contents,
+                return Ok(Some(Hover {
+                    contents,
                         range: Some(span_to_range(symbol_info.span, &text)),
-                    }));
+                }));
                 }
             }
         }
@@ -528,9 +516,9 @@ impl LanguageServer for Backend {
 
     async fn completion(&self, params: CompletionParams) -> Result<Option<CompletionResponse>> {
         let uri = params.text_document_position.text_document.uri;
-        let position = params.text_document_position.position;
+        let _position = params.text_document_position.position;
 
-        let (text, symbol_table) = {
+        let (_text, symbol_table) = {
             let state = self.state.read().await;
             let text = state.documents.get(&uri).cloned();
             let symbol_table = state.symbol_tables.get(&uri).cloned();
@@ -585,7 +573,7 @@ impl LanguageServer for Backend {
 
         let mut hints = Vec::new();
         if let (Some(text), Some(symbol_table)) = (text, symbol_table) {
-            for (name, info) in symbol_table.all_symbols() {
+            for (_name, info) in symbol_table.all_symbols() {
                 if let Some(ty) = &info.ty {
                     if matches!(info.kind, SymbolKind::Variable | SymbolKind::Parameter) {
                         hints.push(InlayHint {
@@ -623,7 +611,7 @@ impl LanguageServer for Backend {
             let mut prev_line = 0;
             let mut prev_col = 0;
 
-            for (name, info) in symbol_table.all_symbols() {
+            for (_name, info) in symbol_table.all_symbols() {
                 let pos = span_to_position(info.span.start(), &text);
                 let token_type = match info.kind {
                     SymbolKind::Function | SymbolKind::Method => 0, // FUNCTION
@@ -642,11 +630,13 @@ impl LanguageServer for Backend {
                 };
                 let length = (info.span.end() - info.span.start()) as u32;
 
-                tokens.push(delta_line);
-                tokens.push(delta_start);
-                tokens.push(length);
-                tokens.push(token_type);
-                tokens.push(0); // modifiers
+                tokens.push(SemanticToken {
+                    delta_line,
+                    delta_start,
+                    length,
+                    token_type,
+                    token_modifiers_bitset: 0,
+                });
 
                 prev_line = pos.line as u32;
                 prev_col = pos.character as u32;
@@ -664,45 +654,41 @@ impl LanguageServer for Backend {
     async fn code_action(
         &self,
         params: CodeActionParams,
-    ) -> Result<Option<CodeActionResponse>> {
+    ) -> Result<Option<Vec<CodeActionOrCommand>>> {
         let mut actions = Vec::new();
 
         // Add "Add type annotation" action for variables
-        if let Some(diagnostics) = &params.context.diagnostics {
-            for diag in diagnostics {
-                if diag.message.contains("type") {
-                    actions.push(CodeActionOrCommand::CodeAction(CodeAction {
-                        title: "Add type annotation".into(),
-                        kind: Some(CodeActionKind::QUICKFIX),
-                        diagnostics: Some(vec![diag.clone()]),
-                        edit: None,
-                        command: None,
-                        is_preferred: Some(true),
-                        disabled: None,
-                        data: None,
-                    }));
-                }
+        for diag in &params.context.diagnostics {
+            if diag.message.contains("type") {
+                actions.push(CodeActionOrCommand::CodeAction(CodeAction {
+                    title: "Add type annotation".into(),
+                    kind: Some(CodeActionKind::QUICKFIX),
+                    diagnostics: Some(vec![diag.clone()]),
+                    edit: None,
+                    command: None,
+                    is_preferred: Some(true),
+                    disabled: None,
+                    data: None,
+                }));
             }
         }
 
         // Add "Extract function" action
-        if let Some(range) = &params.range {
-            actions.push(CodeActionOrCommand::CodeAction(CodeAction {
-                title: "Extract function".into(),
-                kind: Some(CodeActionKind::REFACTOR_EXTRACT),
-                diagnostics: None,
-                edit: None,
-                command: None,
-                is_preferred: None,
-                disabled: None,
-                data: None,
-            }));
-        }
+        actions.push(CodeActionOrCommand::CodeAction(CodeAction {
+            title: "Extract function".into(),
+            kind: Some(CodeActionKind::REFACTOR_EXTRACT),
+            diagnostics: None,
+            edit: None,
+            command: None,
+            is_preferred: None,
+            disabled: None,
+            data: None,
+        }));
 
         if actions.is_empty() {
             Ok(None)
         } else {
-            Ok(Some(CodeActionResponse::Array(actions)))
+            Ok(Some(actions))
         }
     }
 }
@@ -711,7 +697,6 @@ impl LanguageServer for Backend {
 fn span_to_position(byte_offset: usize, text: &str) -> Position {
     let mut line = 0;
     let mut character = 0;
-    let mut offset = 0;
 
     for (i, ch) in text.char_indices() {
         if i >= byte_offset {
@@ -723,7 +708,6 @@ fn span_to_position(byte_offset: usize, text: &str) -> Position {
         } else {
             character += 1;
         }
-        offset = i + ch.len_utf8();
     }
 
     Position { line, character }
@@ -929,7 +913,7 @@ fn collect_references_from_expr(expr: &Expr, table: &mut SymbolTable, tokens: &[
 }
 
 /// Find span of a name in tokens (approximate)
-fn find_name_span(name: &str, tokens: &[Token], text: &str) -> Option<Span> {
+fn find_name_span(name: &str, tokens: &[Token], _text: &str) -> Option<Span> {
     for token in tokens {
         if let lexer::token::TokenKind::Identifier(ref id) = token.kind {
             if id == name {
@@ -976,12 +960,12 @@ fn compute_lsp_diagnostics_and_symbols(text: &str) -> (Vec<Diagnostic>, SymbolTa
                 let symbol_table = build_symbol_table(&program, &tokens, text);
                 
                 let diagnostics = {
-                    let mut checker = TypeChecker::new().with_registry(SymbolRegistry::global());
-                    if checker.check_program(&program).is_err() {
-                        checker.errors().iter().map(type_error_to_lsp).collect()
-                    } else {
-                        Vec::new()
-                    }
+                let mut checker = TypeChecker::new().with_registry(SymbolRegistry::global());
+                if checker.check_program(&program).is_err() {
+                    checker.errors().iter().map(type_error_to_lsp).collect()
+                } else {
+                    Vec::new()
+                }
                 };
                 
                 (diagnostics, symbol_table)
@@ -1031,6 +1015,7 @@ fn word_at_position(text: &str, position: Position) -> Option<String> {
     Some(chars[start..=end].iter().collect())
 }
 
+#[allow(dead_code)]
 fn collect_identifiers(text: &str) -> Vec<String> {
     let mut set = BTreeSet::new();
     for token in text.split(|c: char| !(c.is_alphanumeric() || c == '_')) {

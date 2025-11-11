@@ -5,7 +5,6 @@ use std::time::Duration;
 
 use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
-use colored::Colorize;
 use tracing::{debug, info, warn};
 
 use crate::codegen::{
@@ -623,7 +622,7 @@ fn execute_binary(path: &Path, settings: &CompilationSettings) -> Result<()> {
 fn print_timings(stage: &CompilationStage) {
     println!("\nTimings:");
     let mut total = Duration::ZERO;
-    for PhaseTiming { name, duration } in stage.timings() {
+    for PhaseTiming { name: _, duration } in stage.timings() {
         total += *duration;
     }
     for PhaseTiming { name, duration } in stage.timings() {
