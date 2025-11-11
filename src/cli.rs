@@ -24,7 +24,7 @@ use utils::logger;
 use utils::profiler::{PhaseTiming, Profiler};
 
 #[derive(Parser, Debug)]
-#[command(name = "otter", version = VERSION, about = "🦦 OtterLang compiler CLI - Making programming fun!")]
+#[command(name = "otter", version = VERSION, about = "OtterLang compiler")]
 pub struct OtterCli {
     #[arg(long, global = true)]
     /// Dump the token stream before parsing.
@@ -130,28 +130,18 @@ fn handle_run(cli: &OtterCli, path: &Path) -> Result<()> {
 
     match &stage.result {
         CompilationResult::CacheHit(entry) => {
-            println!(
-                "{} {} {}",
-                "💨".green(),
-                "cache".green().bold(),
-                format!("hit ({} bytes)", entry.metadata.binary_size)
-            );
+            println!("cache hit ({} bytes)", entry.metadata.binary_size);
             if settings.profile {
                 print_profile(&entry.metadata);
             }
             execute_binary(&entry.binary_path, &settings)?;
         }
         CompilationResult::Compiled { artifact, metadata } => {
-            println!(
-                "{} {} {}",
-                "🔨".yellow(),
-                "building".bold(),
-                artifact.binary.display()
-            );
+            println!("building {}", artifact.binary.display());
             execute_binary(&artifact.binary, &settings)?;
             if settings.dump_ir {
                 if let Some(ir) = &artifact.ir {
-                    println!("{}", "⚙️ == LLVM IR ==".bold());
+                    println!("\n== LLVM IR ==");
                     println!("{ir}");
                 }
             }
@@ -192,17 +182,13 @@ fn handle_build(cli: &OtterCli, path: &Path, output: Option<PathBuf>) -> Result<
         )
     })?;
 
-    println!(
-        "{} {}",
-        "✨".green(),
-        format!("built {}", output_path.display()).green().bold()
-    );
+    println!("built {}", output_path.display());
 
     match &stage.result {
         CompilationResult::Compiled { artifact, metadata } => {
             if settings.dump_ir {
                 if let Some(ir) = &artifact.ir {
-                    println!("{}", "⚙️ == LLVM IR ==".bold());
+                    println!("\n== LLVM IR ==");
                     println!("{ir}");
                 }
             }
@@ -268,28 +254,27 @@ fn compile_pipeline(
     };
 
     if settings.dump_tokens {
-        println!("{}", "🔤 == Tokens ==".bold());
+        println!("\n== Tokens ==");
         for token in &tokens {
-            println!("{:?} @ {:?}", token.kind, token.span);
+            println!("  {:?} @ {:?}", token.kind, token.span);
         }
     }
 
     let program = match profiler.record_phase("Parsing", || parse(&tokens)) {
         Ok(program) => {
             if settings.debug {
-                println!("{} Parsed successfully!", "✅".green());
+                println!("Parsed successfully");
             }
             program
         }
         Err(errors) => {
-            println!("{} Parsing failed!", "❌".red());
             emit_parser_errors(&source_id, source, &errors);
             bail!("parsing failed");
         }
     };
 
     if settings.dump_ast {
-        println!("{}", "🌳 == AST ==".bold());
+        println!("\n== AST ==");
         println!("{:#?}", program);
     }
 
@@ -316,10 +301,9 @@ fn compile_pipeline(
         profiler.record_phase("Type Checking", || type_checker.check_program(&program));
 
     if let Err(err) = type_check_result {
-        // Emit type errors
-        println!("{} {}", "🔍".yellow(), "== Type Errors ==".bold().red());
+        println!("\n== Type Errors ==");
         for error in type_checker.errors() {
-            println!("{}", error);
+            println!("  {}", error);
         }
         return Err(err).with_context(|| "type checking failed");
     }
@@ -602,7 +586,7 @@ fn find_stdlib_dir() -> Result<PathBuf> {
 
 fn execute_binary(path: &Path, settings: &CompilationSettings) -> Result<()> {
     if settings.debug {
-        println!("{} Running program: {}", "🚀".cyan(), path.display());
+        println!("Running program: {}", path.display());
     }
 
     let mut command = ProcessCommand::new(path);
@@ -627,9 +611,8 @@ fn execute_binary(path: &Path, settings: &CompilationSettings) -> Result<()> {
 
     if !status.success() {
         if settings.debug {
-            eprintln!("{} {}", "💥".red(), "== Stack Trace ==".bold().red());
-            eprintln!("Program exited with status: {}", status);
-            eprintln!("Run with --debug to see full backtrace");
+            eprintln!("\nStack trace:");
+            eprintln!("  Exit status: {}", status);
         }
         bail!("program exited with status {status}");
     }
@@ -638,8 +621,11 @@ fn execute_binary(path: &Path, settings: &CompilationSettings) -> Result<()> {
 }
 
 fn print_timings(stage: &CompilationStage) {
-    println!("\n{} Compilation Timings:", "⏱️".yellow());
+    println!("\nTimings:");
     let mut total = Duration::ZERO;
+    for PhaseTiming { name, duration } in stage.timings() {
+        total += *duration;
+    }
     for PhaseTiming { name, duration } in stage.timings() {
         let pct = if total.as_secs_f64() > 0.0 {
             (duration.as_secs_f64() / total.as_secs_f64()) * 100.0
@@ -647,17 +633,15 @@ fn print_timings(stage: &CompilationStage) {
             0.0
         };
         println!(
-            "  {} {}: {:.2}ms ({:.1}%)",
-            "📊".cyan(),
-            name.cyan(),
+            "  {:20} {:8.2}ms ({:5.1}%)",
+            name,
             duration.as_secs_f64() * 1000.0,
             pct
         );
-        total += *duration;
     }
     println!(
-        "  {} Total: {:.2}ms",
-        "🎯".green(),
+        "  {:20} {:8.2}ms",
+        "Total",
         total.as_secs_f64() * 1000.0
     );
 }
@@ -668,7 +652,7 @@ fn handle_fmt(paths: &[PathBuf]) -> Result<()> {
     use lexer::tokenize;
     use parser::parse;
 
-    println!("{} Formatting OtterLang files...", "✨".magenta());
+    println!("Formatting OtterLang files...");
 
     let formatter = Formatter::new();
     let mut formatted_count = 0;
@@ -711,23 +695,15 @@ fn handle_fmt(paths: &[PathBuf]) -> Result<()> {
         if formatted != source {
             fs::write(&file_path, formatted)
                 .with_context(|| format!("failed to write {}", file_path.display()))?;
-            println!(
-                "{} {}",
-                "✨".green(),
-                format!("Formatted {}", file_path.display()).green()
-            );
+            println!("  {}", file_path.display());
             formatted_count += 1;
         }
     }
 
     if formatted_count == 0 {
-        println!("{} All files are already formatted! 🎉", "✨".green());
+        println!("All files are already formatted");
     } else {
-        println!(
-            "{} Formatted {} file(s)! 🎉",
-            "✨".green().bold(),
-            formatted_count
-        );
+        println!("\nFormatted {} file(s)", formatted_count);
     }
 
     Ok(())
@@ -735,27 +711,24 @@ fn handle_fmt(paths: &[PathBuf]) -> Result<()> {
 
 fn handle_repl() -> Result<()> {
     use crate::repl::ReplEngine;
-    println!("{} Starting OtterLang REPL...", "🦦".cyan());
-    println!(
-        "{} Type 'exit' or 'quit' to exit, 'help' for help",
-        "💡".yellow()
-    );
+    println!("Starting OtterLang REPL...");
+    println!("Type 'exit' or 'quit' to exit, 'help' for help");
     let mut repl = ReplEngine::new();
     repl.run()
 }
 
 fn print_profile(metadata: &CacheMetadata) {
-    println!("\n{} Compilation Profile:", "📈".magenta());
-    println!("{:>16}: {}", "Binary", metadata.binary_path.display());
-    println!("{:>16}: {} bytes", "Size", metadata.binary_size);
-    println!("{:>16}: {} ms", "Build", metadata.build_time_ms);
+    println!("\nProfile:");
+    println!("  Binary: {}", metadata.binary_path.display());
+    println!("  Size:   {} bytes", metadata.binary_size);
+    println!("  Build:  {} ms", metadata.build_time_ms);
     if let Some(version) = &metadata.llvm_version {
-        println!("{:>16}: {version}", "LLVM");
+        println!("  LLVM:   {}", version);
     }
 }
 
 fn emit_lexer_errors(source_id: &str, source: &str, errors: &[LexerError]) {
-    println!("{} Lexical errors detected!", "🔤".red());
+    println!("\nLexical errors:");
     let diagnostics: Vec<Diagnostic> = errors
         .iter()
         .map(|err| err.to_diagnostic(source_id))
@@ -764,7 +737,7 @@ fn emit_lexer_errors(source_id: &str, source: &str, errors: &[LexerError]) {
 }
 
 fn emit_parser_errors(source_id: &str, source: &str, errors: &[ParserError]) {
-    println!("{} Parsing errors detected!", "📝".red());
+    println!("\nParsing errors:");
     let diagnostics: Vec<Diagnostic> = errors
         .iter()
         .map(|err| err.to_diagnostic(source_id))
