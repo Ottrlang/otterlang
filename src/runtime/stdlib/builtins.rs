@@ -1228,7 +1228,98 @@ pub unsafe extern "C" fn otter_builtin_select_case_free(case: *mut SelectCase) {
 ///
 /// this function dereferences a raw pointer
 /// caller must guarantee that `num_cases` is valid within the span `cases`
-#[unsafe(no_mangle)]
+// Async/await runtime functions using tokio
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use tokio::task::JoinHandle;
+
+#[derive(Clone)]
+struct TaskHandle {
+    handle: Arc<Mutex<Option<JoinHandle<i64>>>>,
+}
+
+impl TaskHandle {
+    fn new() -> Self {
+        Self {
+            handle: Arc::new(Mutex::new(None)),
+        }
+    }
+}
+
+static TASK_HANDLES: Mutex<Vec<TaskHandle>> = Mutex::const_new(vec![]);
+
+pub extern "C" fn otter_builtin_spawn_async(value: i64) -> u64 {
+    // Spawn a new async task that just returns the value
+    // In a real implementation, this would execute a closure or function
+    let task_handle = TaskHandle::new();
+
+    let handle_clone = task_handle.handle.clone();
+    let value_clone = value;
+    let tokio_handle = tokio::spawn(async move {
+        // For now, just return the value after a brief delay to simulate async work
+        tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
+        value_clone
+    });
+
+    // Store the handle
+    let mut guard = TASK_HANDLES.blocking_lock();
+    let handle_id = guard.len() as u64;
+    guard.push(task_handle);
+
+    // Set the handle in a separate task to avoid blocking
+    tokio::spawn(async move {
+        let mut handle_guard = handle_clone.lock().await;
+        *handle_guard = Some(tokio_handle);
+    });
+
+    handle_id
+}
+
+pub extern "C" fn otter_builtin_await_task(task_handle: u64) -> i64 {
+    // Wait for the task to complete and return its result
+    let guard = TASK_HANDLES.blocking_lock();
+    if let Some(task) = guard.get(task_handle as usize) {
+        let handle_clone = task.handle.clone();
+
+        // Block on the async operation
+        tokio::runtime::Handle::current().block_on(async {
+            let mut handle_guard = handle_clone.lock().await;
+            if let Some(join_handle) = handle_guard.take() {
+                join_handle.await.unwrap_or(0)
+            } else {
+                0
+            }
+        })
+    } else {
+        0
+    }
+}
+
+pub extern "C" fn otter_builtin_task_ready(task_handle: u64) -> bool {
+    // Check if the task is ready (completed)
+    let guard = TASK_HANDLES.blocking_lock();
+    if let Some(task) = guard.get(task_handle as usize) {
+        let handle_clone = task.handle.clone();
+
+        tokio::runtime::Handle::current().block_on(async {
+            let handle_guard = handle_clone.lock().await;
+            if let Some(ref join_handle) = *handle_guard {
+                join_handle.is_finished()
+            } else {
+                false
+            }
+        })
+    } else {
+        false
+    }
+}
+
+/// # Safety
+///
+/// This function dereferences the `cases` raw pointer.
+/// The caller must ensure that `cases` points to a valid array of `SelectCase` structures
+/// with at least `num_cases` elements, and that the memory remains valid for the duration
+/// of the function call.
 pub unsafe extern "C" fn otter_builtin_select(
     cases: *const SelectCase,
     num_cases: i64,
@@ -1691,6 +1782,25 @@ fn register_builtin_symbols(registry: &SymbolRegistry) {
         name: "select".into(),
         symbol: "otter_builtin_select".into(),
         signature: FfiSignature::new(vec![FfiType::List, FfiType::Bool], FfiType::I64),
+    });
+
+    // Async/await functions
+    registry.register(FfiFunction {
+        name: "spawn_async".into(),
+        symbol: "otter_builtin_spawn_async".into(),
+        signature: FfiSignature::new(vec![FfiType::I64], FfiType::Opaque),
+    });
+
+    registry.register(FfiFunction {
+        name: "await_task".into(),
+        symbol: "otter_builtin_await_task".into(),
+        signature: FfiSignature::new(vec![FfiType::Opaque], FfiType::I64),
+    });
+
+    registry.register(FfiFunction {
+        name: "task_ready".into(),
+        symbol: "otter_builtin_task_ready".into(),
+        signature: FfiSignature::new(vec![FfiType::Opaque], FfiType::Bool),
     });
 }
 

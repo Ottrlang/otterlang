@@ -75,6 +75,31 @@ impl CallGraph {
             .map(|callees| callees.contains(&callee.to_string()))
             .unwrap_or(false)
     }
+
+    /// Return the number of direct callees recorded for `function_name`.
+    pub fn call_count(&self, function_name: &str) -> usize {
+        self.calls
+            .get(function_name)
+            .map(|callees| callees.len())
+            .unwrap_or(0)
+    }
+
+    /// Return the `limit` functions with the highest out-degree in the call graph.
+    /// This acts as a heuristic "hot" list when no profiler guidance is available.
+    pub fn hot_candidates(&self, limit: usize) -> Vec<String> {
+        let mut entries: Vec<_> = self
+            .calls
+            .iter()
+            .map(|(name, callees)| (name.clone(), callees.len()))
+            .collect();
+
+        entries.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        entries
+            .into_iter()
+            .take(limit)
+            .map(|(name, _)| name)
+            .collect()
+    }
 }
 
 impl Default for CallGraph {

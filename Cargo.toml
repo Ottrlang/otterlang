@@ -27,6 +27,7 @@ path = "src/bin/lsp.rs"
 [features]
 default = []
 task-runtime = []
+cranelift-backend = []
 
 [dependencies]
 ast.path = "crates/ast"
@@ -58,6 +59,15 @@ inventory = "0.3"
 indicatif = "0.17"
 inkwell = { version = "0.x", features = ["llvm18-1"] }
 libloading = "0.8"
+
+# Cranelift backend dependencies
+cranelift-codegen = "0.110"
+cranelift-frontend = "0.110"
+cranelift-module = "0.110"
+cranelift-object = "0.110"
+cranelift-jit = "0.110"
+cranelift-native = "0.110"
+target-lexicon = "0.12"
 libm = "0.2"
 libc = "0.2"
 memmap2 = "0.9"
@@ -75,7 +85,7 @@ thiserror = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 tower-lsp = "0.20"
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std", "time"] }
 ratatui = "0.29.0"
 crossterm = "0.29.0"
 

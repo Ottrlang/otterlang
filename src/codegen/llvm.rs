@@ -19,6 +19,7 @@ use inkwell::values::{
     BasicMetadataValueEnum, BasicValueEnum, FunctionValue, IntValue, PointerValue,
 };
 
+use crate::codegen::CodegenBackendType;
 use crate::codegen::target::TargetTriple;
 use crate::runtime::ffi::register_dynamic_exports;
 use crate::runtime::symbol_registry::{FfiFunction, FfiSignature, FfiType, SymbolRegistry};
@@ -37,6 +38,8 @@ pub struct CodegenOptions {
     pub inline_threshold: Option<u32>,
     /// Target triple for cross-compilation (defaults to native)
     pub target: Option<TargetTriple>,
+    /// Codegen backend to use
+    pub backend: CodegenBackendType,
 }
 
 impl Default for CodegenOptions {
@@ -47,8 +50,9 @@ impl Default for CodegenOptions {
             enable_lto: false,
             enable_pgo: false,
             pgo_profile_file: None,
-            inline_threshold: None, // Use LLVM default
-            target: None,           // Use native target
+            inline_threshold: None,            // Use LLVM default
+            target: None,                      // Use native target
+            backend: CodegenBackendType::LLVM, // Default to LLVM for compatibility
         }
     }
 }
@@ -78,7 +82,7 @@ fn llvm_triple_to_string(triple: &inkwell::targets::TargetTriple) -> String {
         .to_string()
 }
 
-fn preferred_target_flag(driver: &str) -> &'static str {
+pub(crate) fn preferred_target_flag(driver: &str) -> &'static str {
     if driver_prefers_clang_style(driver) {
         "-target"
     } else {
@@ -654,7 +658,10 @@ pub fn build_shared_library(
     })
 }
 
-fn prepare_rust_bridges(program: &Program, registry: &SymbolRegistry) -> Result<Vec<PathBuf>> {
+pub(crate) fn prepare_rust_bridges(
+    program: &Program,
+    registry: &SymbolRegistry,
+) -> Result<Vec<PathBuf>> {
     let imports = collect_rust_imports(program);
     if imports.is_empty() {
         return Ok(Vec::new());

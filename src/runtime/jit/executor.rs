@@ -1,3 +1,4 @@
+use crate::codegen::CodegenBackendType;
 use crate::runtime::symbol_registry::SymbolRegistry;
 use anyhow::Result;
 use ast::nodes::Program;
@@ -13,7 +14,15 @@ pub struct JitExecutor {
 
 impl JitExecutor {
     pub fn new(program: Program, symbol_registry: &'static SymbolRegistry) -> Result<Self> {
-        let mut engine = JitEngine::new(symbol_registry)?;
+        Self::new_with_backend(program, symbol_registry, CodegenBackendType::LLVM)
+    }
+
+    pub fn new_with_backend(
+        program: Program,
+        symbol_registry: &'static SymbolRegistry,
+        backend: CodegenBackendType,
+    ) -> Result<Self> {
+        let mut engine = JitEngine::new_with_backend(symbol_registry, backend)?;
         engine.compile_program(&program)?;
 
         Ok(Self { engine, program })

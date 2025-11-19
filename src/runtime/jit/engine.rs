@@ -6,7 +6,10 @@ use std::ffi::CString;
 use std::sync::{Arc, Mutex};
 use tempfile::TempDir;
 
-use crate::codegen::{CodegenOptLevel, CodegenOptions, build_shared_library};
+use crate::codegen::{
+    CodegenBackendType, CodegenOptLevel, CodegenOptions, build_shared_library,
+    build_shared_library_with_backend,
+};
 use crate::runtime::symbol_registry::SymbolRegistry;
 use crate::typecheck::TypeChecker;
 use ast::nodes::Program;
@@ -85,6 +88,8 @@ pub struct JitEngine {
     concurrency_manager: AdaptiveConcurrencyManager,
     #[allow(dead_code)]
     symbol_registry: &'static SymbolRegistry,
+    /// Codegen backend to use
+    backend: CodegenBackendType,
     // Runtime state
     compiled_library: Arc<Mutex<Option<Arc<Library>>>>,
     compiled_functions: Arc<Mutex<HashMap<String, CompiledFunction>>>,
@@ -96,6 +101,13 @@ pub struct JitEngine {
 
 impl JitEngine {
     pub fn new(symbol_registry: &'static SymbolRegistry) -> Result<Self> {
+        Self::new_with_backend(symbol_registry, CodegenBackendType::LLVM)
+    }
+
+    pub fn new_with_backend(
+        symbol_registry: &'static SymbolRegistry,
+        backend: CodegenBackendType,
+    ) -> Result<Self> {
         let temp_dir =
             TempDir::new().map_err(|e| anyhow!("Failed to create temp directory: {}", e))?;
 
@@ -110,6 +122,7 @@ impl JitEngine {
             memory_manager: AdaptiveMemoryManager::new(),
             concurrency_manager: AdaptiveConcurrencyManager::new(),
             symbol_registry,
+            backend,
             compiled_library: Arc::new(Mutex::new(None)),
             compiled_functions: Arc::new(Mutex::new(HashMap::new())),
             temp_dir,
@@ -142,6 +155,7 @@ impl JitEngine {
             enable_pgo: false,
             pgo_profile_file: None,
             inline_threshold: None,
+            backend: self.backend,
         };
 
         let mut type_checker = TypeChecker::new().with_registry(SymbolRegistry::global());
@@ -150,7 +164,7 @@ impl JitEngine {
             .context("Type checking failed during JIT compilation")?;
         let expr_types = type_checker.into_expr_type_map();
 
-        let artifact = build_shared_library(program, &expr_types, &lib_path, &options)
+        let artifact = build_shared_library_with_backend(program, &expr_types, &lib_path, &options)
             .context("Failed to compile program to shared library")?;
 
         let lib_path = artifact.binary;
@@ -314,6 +328,7 @@ impl JitEngine {
             opt_level: CodegenOptLevel::Aggressive,
             enable_lto: true,
             enable_pgo: false,
+            backend: self.backend,
             pgo_profile_file: None,
             inline_threshold: None,
         };
