@@ -145,6 +145,24 @@ jobs:
           "INCLUDE=$incDir;$env:INCLUDE" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "LIBXML2_INCLUDE_PATH=$incDir" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
       
+      - name: Get Cargo hash
+        id: cargo-hash
+        if: ${{ matrix.os != 'windows-latest' }}
+        run: |
+          if command -v sha256sum > /dev/null; then
+            if [ -f Cargo.lock ]; then
+              echo "hash=$(cat Cargo.toml Cargo.lock | sha256sum | awk '{print $1}')" >> $GITHUB_OUTPUT
+            else
+              echo "hash=$(cat Cargo.toml | sha256sum | awk '{print $1}')" >> $GITHUB_OUTPUT
+            fi
+          else
+            if [ -f Cargo.lock ]; then
+              echo "hash=$(cat Cargo.toml Cargo.lock | shasum -a 256 | awk '{print $1}')" >> $GITHUB_OUTPUT
+            else
+              echo "hash=$(cat Cargo.toml | shasum -a 256 | awk '{print $1}')" >> $GITHUB_OUTPUT
+            fi
+          fi
+      
       - name: Cache Cargo dependencies
         uses: actions/cache@v4
         with:
@@ -154,7 +172,7 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
             target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.toml') }}
+          key: ${{ runner.os }}-cargo-${{ steps.cargo-hash.outputs.hash }}
           restore-keys: |
             ${{ runner.os }}-cargo-
         if: ${{ matrix.os != 'windows-latest' }}
