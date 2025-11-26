@@ -1256,21 +1256,28 @@ impl TypeChecker {
                         {
                             Ok(TypeInfo::Module(name.clone()))
                         } else {
-                            Err(TypeError::new(format!("undefined variable: {}", name))
+                            self.errors.push(
+                                TypeError::new(format!("undefined variable: {}", name))
+                                    .with_hint(format!(
+                                        "did you mean to declare it with `let {}`?",
+                                        name
+                                    ))
+                                    .with_help("Variables must be declared before use".to_string())
+                                    .with_span(*span),
+                            );
+                            Ok(TypeInfo::Error)
+                        }
+                    } else {
+                        self.errors.push(
+                            TypeError::new(format!("undefined variable: {}", name))
                                 .with_hint(format!(
                                     "did you mean to declare it with `let {}`?",
                                     name
                                 ))
                                 .with_help("Variables must be declared before use".to_string())
-                                .with_span(*span)
-                                .into())
-                        }
-                    } else {
-                        Err(TypeError::new(format!("undefined variable: {}", name))
-                            .with_hint(format!("did you mean to declare it with `let {}`?", name))
-                            .with_help("Variables must be declared before use".to_string())
-                            .with_span(*span)
-                            .into())
+                                .with_span(*span),
+                        );
+                        Ok(TypeInfo::Error)
                     }
                 }
                 Expr::Binary { op, left, right } => {
@@ -1437,11 +1444,13 @@ impl TypeChecker {
                     let span = func.span();
                     let func_type = match func.as_ref().as_ref() {
                         Expr::Identifier(name) => {
-                            self.context.get_function(name).cloned().ok_or_else(|| {
-                                let err = TypeError::new(format!("undefined function: {}", name))
-                                    .with_span(*span);
-                                anyhow::Error::from(err)
-                            })?
+                            self.context.get_function(name).cloned().unwrap_or_else(|| {
+                                self.errors.push(
+                                    TypeError::new(format!("undefined function: {}", name))
+                                        .with_span(*span),
+                                );
+                                TypeInfo::Error
+                            })
                         }
                         Expr::Member { object, field } => {
                             let full_name = self.build_member_path(object, field);
