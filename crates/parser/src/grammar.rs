@@ -1001,7 +1001,7 @@ fn program_parser() -> impl Parser<TokenKind, Program, Error = Simple<TokenKind>
 
     let let_stmt = pub_keyword
         .clone()
-        .then(just(TokenKind::Let).or_not())
+        .then(just(TokenKind::Let))
         .then(
             identifier_parser()
                 .map_with_span(Node::new)
@@ -1021,8 +1021,13 @@ fn program_parser() -> impl Parser<TokenKind, Program, Error = Simple<TokenKind>
             )
         });
 
-    // Simple assignments (=) are handled by let_stmt (declaration or reassignment)
-    let assignment_stmt = identifier_parser()
+    let simple_assignment_stmt = identifier_parser()
+        .map_with_span(Node::new)
+        .then_ignore(just(TokenKind::Equals))
+        .then(expr.clone())
+        .map_with_span(|(name, expr), span| Node::new(Statement::Assignment { name, expr }, span));
+
+    let compound_assignment_stmt = identifier_parser()
         .map_with_span(|name, span| (name, Span::new(span.start, span.end)))
         .then(choice((
             just(TokenKind::PlusEq).to(BinaryOp::Add),
@@ -1316,7 +1321,8 @@ fn program_parser() -> impl Parser<TokenKind, Program, Error = Simple<TokenKind>
             print_stmt,
             return_stmt,
             let_stmt,
-            assignment_stmt,
+            compound_assignment_stmt,
+            simple_assignment_stmt,
             use_stmt,
             pub_use_stmt,
             if_stmt,
