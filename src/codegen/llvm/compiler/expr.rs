@@ -210,9 +210,51 @@ impl<'ctx> Compiler<'ctx> {
                 phi.add_incoming(&[(val, *block)]);
             }
 
+            // Infer the result type from the match expression's type annotation if available
+            let match_expr_id = expr as *const Expr as usize;
+            let result_ty = if let Some(type_info) = self.expr_types.get(&match_expr_id) {
+                self.typeinfo_to_otter_type(type_info).unwrap_or_else(|| {
+                    // Fallback to inferring from phi type
+                    if phi_type.is_pointer_type() {
+                        OtterType::Str
+                    } else if phi_type.is_int_type() {
+                        let int_type = phi_type.into_int_type();
+                        if int_type.get_bit_width() == 64 {
+                            OtterType::I64
+                        } else if int_type.get_bit_width() == 1 {
+                            OtterType::Bool
+                        } else {
+                            OtterType::I32
+                        }
+                    } else if phi_type.is_float_type() {
+                        OtterType::F64
+                    } else {
+                        OtterType::Opaque
+                    }
+                })
+            } else {
+                // No type info, infer from phi type
+                if phi_type.is_pointer_type() {
+                    OtterType::Str
+                } else if phi_type.is_int_type() {
+                    let int_type = phi_type.into_int_type();
+                    if int_type.get_bit_width() == 64 {
+                        OtterType::I64
+                    } else if int_type.get_bit_width() == 1 {
+                        OtterType::Bool
+                    } else {
+                        OtterType::I32
+                    }
+                } else if phi_type.is_float_type() {
+                    OtterType::F64
+                } else {
+                    OtterType::Opaque
+                }
+            };
+
             Ok(EvaluatedValue::with_value(
                 phi.as_basic_value(),
-                OtterType::Opaque,
+                result_ty,
             ))
         } else {
             Ok(EvaluatedValue {

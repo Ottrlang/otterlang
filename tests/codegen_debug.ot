@@ -1,0 +1,5 @@
+fn main():
+    print("Testing array loop:")
+    let arr: list<int> = [10, 20, 30]
+    for x in arr:
+        print(stringify<int>(x))

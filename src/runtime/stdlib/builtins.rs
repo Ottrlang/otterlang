@@ -32,6 +32,146 @@ pub enum Value {
     Map(HandleId),
 }
 
+// Runtime Value Handle Registry
+// Instead of encoding type info into bits, we store full-precision values
+// in a registry and return handles with embedded type information
+
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ValueKind {
+    Unit = 0,
+    Bool = 1,
+    I64 = 2,
+    F64 = 3,
+    String = 4,
+    List = 5,
+    Map = 6,
+}
+
+struct RuntimeValue {
+    kind: ValueKind,
+    value: Value,
+}
+
+static RUNTIME_VALUES: Lazy<RwLock<std::collections::HashMap<HandleId, RuntimeValue>>> =
+    Lazy::new(|| RwLock::new(std::collections::HashMap::new()));
+
+// Encode value handle with type tag in upper 8 bits, handle ID in lower 56 bits
+// This gives us full precision for all types
+const TAG_SHIFT: u32 = 56;
+const HANDLE_MASK: u64 = (1u64 << TAG_SHIFT) - 1;
+
+fn encode_runtime_value(value: &Value) -> u64 {
+    let kind = match value {
+        Value::Unit => ValueKind::Unit,
+        Value::Bool(_) => ValueKind::Bool,
+        Value::I64(_) => ValueKind::I64,
+        Value::F64(_) => ValueKind::F64,
+        Value::String(_) => ValueKind::String,
+        Value::List(_) => ValueKind::List,
+        Value::Map(_) => ValueKind::Map,
+    };
+    
+    // For simple scalar values that fit in 56 bits without loss, encode directly
+    match value {
+        Value::Unit => (ValueKind::Unit as u64) << TAG_SHIFT,
+        Value::Bool(b) => {
+            let val = if *b { 1u64 } else { 0u64 };
+            ((ValueKind::Bool as u64) << TAG_SHIFT) | val
+        }
+        Value::I64(_i) => {
+            // For I64, we need full 64-bit precision, so use handle
+            let handle_id = next_handle_id();
+            RUNTIME_VALUES.write().insert(handle_id, RuntimeValue {
+                kind,
+                value: value.clone(),
+            });
+            ((ValueKind::I64 as u64) << TAG_SHIFT) | (handle_id & HANDLE_MASK)
+        }
+        Value::F64(_f) => {
+            // For F64, we need full 64-bit precision, so use handle
+            let handle_id = next_handle_id();
+            RUNTIME_VALUES.write().insert(handle_id, RuntimeValue {
+                kind,
+                value: value.clone(),
+            });
+            ((ValueKind::F64 as u64) << TAG_SHIFT) | (handle_id & HANDLE_MASK)
+        }
+        Value::String(s) => {
+            // For strings, store pointer directly with tag
+            let ptr = CString::new(s.clone()).unwrap().into_raw() as u64;
+            ((ValueKind::String as u64) << TAG_SHIFT) | (ptr & HANDLE_MASK)
+        }
+        Value::List(h) | Value::Map(h) => {
+            // Lists and maps already use handles
+            let tag = if matches!(value, Value::List(_)) { ValueKind::List } else { ValueKind::Map };
+            ((tag as u64) << TAG_SHIFT) | (*h & HANDLE_MASK)
+        }
+    }
+}
+
+pub fn decode_value_kind(encoded: u64) -> ValueKind {
+    let tag = (encoded >> TAG_SHIFT) as u8;
+    match tag {
+        0 => ValueKind::Unit,
+        1 => ValueKind::Bool,
+        2 => ValueKind::I64,
+        3 => ValueKind::F64,
+        4 => ValueKind::String,
+        5 => ValueKind::List,
+        6 => ValueKind::Map,
+        _ => ValueKind::Unit,
+    }
+}
+
+pub fn decode_value_handle(encoded: u64) -> u64 {
+    encoded & HANDLE_MASK
+}
+
+// Decode and extract the actual value with full precision
+fn decode_runtime_value(encoded: u64) -> Option<Value> {
+    let kind = decode_value_kind(encoded);
+    let handle = decode_value_handle(encoded);
+    
+    match kind {
+        ValueKind::Unit => Some(Value::Unit),
+        ValueKind::Bool => {
+            Some(Value::Bool(handle != 0))
+        }
+        ValueKind::I64 => {
+            // Look up in registry for full precision
+            let values = RUNTIME_VALUES.read();
+            values.get(&handle).map(|rv| rv.value.clone())
+        }
+        ValueKind::F64 => {
+            // Look up in registry for full precision
+            let values = RUNTIME_VALUES.read();
+            values.get(&handle).map(|rv| rv.value.clone())
+        }
+        ValueKind::String => {
+            // Reconstruct from pointer
+            if handle == 0 {
+                Some(Value::String(String::new()))
+            } else {
+                unsafe {
+                    let ptr = handle as *const c_char;
+                    if !ptr.is_null() {
+                        if let Ok(cstr) = CStr::from_ptr(ptr).to_str() {
+                            Some(Value::String(cstr.to_string()))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                }
+            }
+        }
+        ValueKind::List => Some(Value::List(handle)),
+        ValueKind::Map => Some(Value::Map(handle)),
+    }
+}
+
 pub struct List {
     pub items: Vec<Value>,
 }
@@ -845,26 +985,17 @@ pub extern "C" fn otter_builtin_iter_next_array(iter_handle: u64) -> u64 {
     let mut iterators = ARRAY_ITERATORS.write();
     if let Some(iter) = iterators.get_mut(&iter_handle) {
         if let Some(val) = list_value(iter.handle, iter.index as i64) {
+            eprintln!("DEBUG: Iterator returning value: {:?}", val);
             iter.index += 1;
-            match val {
-                Value::I64(i) => i as u64,
-                Value::F64(f) => f.to_bits(),
-                Value::Bool(b) => {
-                    if b {
-                        1
-                    } else {
-                        0
-                    }
-                }
-                Value::String(s) => CString::new(s).unwrap().into_raw() as u64,
-                Value::List(h) => h,
-                Value::Map(h) => h,
-                Value::Unit => 0,
-            }
+            let encoded = encode_runtime_value(&val);
+            eprintln!("DEBUG: Encoded as: {:#x}", encoded);
+            encoded
         } else {
+            eprintln!("DEBUG: No value at index {} for list handle {}", iter.index, iter.handle);
             0
         }
     } else {
+        eprintln!("DEBUG: Iterator handle {} not found", iter_handle);
         0
     }
 }
@@ -1940,6 +2071,169 @@ fn register_builtin_symbols(registry: &SymbolRegistry) {
         symbol: "otter_builtin_iter_free_string".into(),
         signature: FfiSignature::new(vec![FfiType::Opaque], FfiType::Unit),
     });
+    
+    // Runtime value decoding functions with full precision
+    registry.register(FfiFunction {
+        name: "__otter_decode_value_kind".into(),
+        symbol: "otter_decode_value_kind".into(),
+        signature: FfiSignature::new(vec![FfiType::I64], FfiType::I64),
+    });
+    
+    registry.register(FfiFunction {
+        name: "__otter_decode_value_handle".into(),
+        symbol: "otter_decode_value_handle".into(),
+        signature: FfiSignature::new(vec![FfiType::I64], FfiType::I64),
+    });
+    
+    registry.register(FfiFunction {
+        name: "__otter_decode_value_as_bool".into(),
+        symbol: "otter_decode_value_as_bool".into(),
+        signature: FfiSignature::new(vec![FfiType::I64], FfiType::Bool),
+    });
+    
+    registry.register(FfiFunction {
+        name: "__otter_decode_value_as_i64".into(),
+        symbol: "otter_decode_value_as_i64".into(),
+        signature: FfiSignature::new(vec![FfiType::I64], FfiType::I64),
+    });
+    
+    registry.register(FfiFunction {
+        name: "__otter_decode_value_as_f64".into(),
+        symbol: "otter_decode_value_as_f64".into(),
+        signature: FfiSignature::new(vec![FfiType::I64], FfiType::F64),
+    });
+    
+    registry.register(FfiFunction {
+        name: "__otter_decode_value_as_string".into(),
+        symbol: "otter_decode_value_as_string".into(),
+        signature: FfiSignature::new(vec![FfiType::I64], FfiType::Str),
+    });
+    
+    registry.register(FfiFunction {
+        name: "__otter_decode_value_as_handle".into(),
+        symbol: "otter_decode_value_as_handle".into(),
+        signature: FfiSignature::new(vec![FfiType::I64], FfiType::I64),
+    });
+    
+    registry.register(FfiFunction {
+        name: "__otter_free_runtime_value".into(),
+        symbol: "otter_free_runtime_value".into(),
+        signature: FfiSignature::new(vec![FfiType::I64], FfiType::Unit),
+    });
+}
+
+// Export decode functions for FFI
+#[unsafe(no_mangle)]
+pub extern "C" fn otter_decode_value_kind(encoded: u64) -> u64 {
+    decode_value_kind(encoded) as u64
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn otter_decode_value_handle(encoded: u64) -> u64 {
+    decode_value_handle(encoded)
+}
+
+// Type-specific decode functions for full precision
+#[unsafe(no_mangle)]
+pub extern "C" fn otter_decode_value_as_bool(encoded: u64) -> bool {
+    let kind = decode_value_kind(encoded);
+    let handle = decode_value_handle(encoded);
+    
+    match kind {
+        ValueKind::Bool => handle != 0,
+        _ => false,
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn otter_decode_value_as_i64(encoded: u64) -> i64 {
+    let kind = decode_value_kind(encoded);
+    let handle = decode_value_handle(encoded);
+    
+    match kind {
+        ValueKind::I64 => {
+            // Look up in registry
+            let values = RUNTIME_VALUES.read();
+            if let Some(rv) = values.get(&handle) {
+                if let Value::I64(i) = rv.value {
+                    return i;
+                }
+            }
+            0
+        }
+        _ => 0,
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn otter_decode_value_as_f64(encoded: u64) -> f64 {
+    let kind = decode_value_kind(encoded);
+    let handle = decode_value_handle(encoded);
+    
+    eprintln!("DEBUG: Decoding F64 - kind={:?}, handle={}, encoded={:#x}", kind, handle, encoded);
+    
+    match kind {
+        ValueKind::F64 => {
+            // Look up in registry
+            let values = RUNTIME_VALUES.read();
+            eprintln!("DEBUG: Registry has {} entries", values.len());
+            if let Some(rv) = values.get(&handle) {
+                if let Value::F64(f) = rv.value {
+                    eprintln!("DEBUG: Found F64 value: {}", f);
+                    return f;
+                }
+            }
+            eprintln!("WARNING: F64 value not found for handle {}", handle);
+            0.0
+        }
+        _ => {
+            eprintln!("WARNING: Decoding as F64 but kind is {:?}", kind);
+            0.0
+        }
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn otter_decode_value_as_string(encoded: u64) -> *mut c_char {
+    let kind = decode_value_kind(encoded);
+    let handle = decode_value_handle(encoded);
+    
+    match kind {
+        ValueKind::String => {
+            // Handle is actually a pointer
+            if handle == 0 {
+                CString::new("").ok().map(CString::into_raw).unwrap_or(std::ptr::null_mut())
+            } else {
+                unsafe {
+                    let ptr = handle as *const c_char;
+                    // Copy the string since we need to return a new owned pointer
+                    if let Ok(cstr) = CStr::from_ptr(ptr).to_str() {
+                        CString::new(cstr).ok().map(CString::into_raw).unwrap_or(std::ptr::null_mut())
+                    } else {
+                        std::ptr::null_mut()
+                    }
+                }
+            }
+        }
+        _ => std::ptr::null_mut(),
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn otter_decode_value_as_handle(encoded: u64) -> u64 {
+    decode_value_handle(encoded)
+}
+
+// Cleanup function to free runtime value handles
+#[unsafe(no_mangle)]
+pub extern "C" fn otter_free_runtime_value(encoded: u64) {
+    let kind = decode_value_kind(encoded);
+    let handle = decode_value_handle(encoded);
+    
+    // Only free registry entries for I64 and F64 which use handles
+    if matches!(kind, ValueKind::I64 | ValueKind::F64) {
+        RUNTIME_VALUES.write().remove(&handle);
+    }
 }
 
 #[cfg(feature = "ffi-main")]

@@ -285,136 +285,52 @@ impl<'ctx> Compiler<'ctx> {
             let end_val = self.eval_expr(end.as_ref().as_ref(), ctx)?;
             let start_ty = start_val.ty.clone();
 
-            // Determine if we're using I64 or F64 iterators
+            // Determine if we're using I64 or F64 range
             let is_float = start_ty == OtterType::F64;
-
-            // Get runtime iterator functions (copy to avoid borrow issues)
-            let (iter_create_fn, iter_has_next_fn, iter_next_fn, iter_free_fn) = if is_float {
-                (
-                    *self
-                        .declared_functions
-                        .get("__otter_iter_range_f64")
-                        .ok_or_else(|| anyhow::anyhow!("Iterator runtime not available"))?,
-                    *self
-                        .declared_functions
-                        .get("__otter_iter_has_next_f64")
-                        .ok_or_else(|| anyhow::anyhow!("Iterator runtime not available"))?,
-                    *self
-                        .declared_functions
-                        .get("__otter_iter_next_f64")
-                        .ok_or_else(|| anyhow::anyhow!("Iterator runtime not available"))?,
-                    *self
-                        .declared_functions
-                        .get("__otter_iter_free_f64")
-                        .ok_or_else(|| anyhow::anyhow!("Iterator runtime not available"))?,
-                )
+            
+            // Call the appropriate range function to get a list handle
+            let range_fn_name = if is_float {
+                "range<float>"
             } else {
-                (
-                    *self
-                        .declared_functions
-                        .get("__otter_iter_range")
-                        .ok_or_else(|| anyhow::anyhow!("Iterator runtime not available"))?,
-                    *self
-                        .declared_functions
-                        .get("__otter_iter_has_next")
-                        .ok_or_else(|| anyhow::anyhow!("Iterator runtime not available"))?,
-                    *self
-                        .declared_functions
-                        .get("__otter_iter_next")
-                        .ok_or_else(|| anyhow::anyhow!("Iterator runtime not available"))?,
-                    *self
-                        .declared_functions
-                        .get("__otter_iter_free")
-                        .ok_or_else(|| anyhow::anyhow!("Iterator runtime not available"))?,
-                )
+                "range<int>"
             };
+            
+            let range_fn = self.get_or_declare_ffi_function(range_fn_name)?;
+            
+            let list_handle = self.builder.build_call(
+                range_fn,
+                &[
+                    start_val.value.unwrap().into(),
+                    end_val.value.unwrap().into(),
+                ],
+                "range_list",
+            )?;
+            
+            let list_val = list_handle.try_as_basic_value().left().unwrap();
+            
+            // Now treat it as a list iteration
+            let iter_create_fn = self.get_or_declare_ffi_function("__otter_iter_array")?;
+            let iter_has_next_fn = self.get_or_declare_ffi_function("__otter_iter_has_next_array")?;
+            let iter_next_fn = self.get_or_declare_ffi_function("__otter_iter_next_array")?;
+            let iter_free_fn = self.get_or_declare_ffi_function("__otter_iter_free_array")?;
 
-            // Create iterator
-            let iter_ptr = self
-                .builder
-                .build_call(
-                    iter_create_fn,
-                    &[
-                        start_val.value.unwrap().into(),
-                        end_val.value.unwrap().into(),
-                    ],
-                    "iter",
-                )?
-                .try_as_basic_value()
-                .left()
-                .unwrap();
-
-            // Create loop variable
-            let loop_var_alloca =
-                self.create_entry_block_alloca(function, var, start_ty.clone())?;
-
-            ctx.insert(
-                var.to_string(),
-                Variable {
-                    ptr: loop_var_alloca,
-                    ty: start_ty,
+            self.lower_collection_for_loop(
+                var,
+                EvaluatedValue::with_value(list_val, OtterType::List),
+                body,
+                function,
+                ctx,
+                IteratorRuntime {
+                    create_fn: iter_create_fn,
+                    has_next_fn: iter_has_next_fn,
+                    next_fn: iter_next_fn,
+                    free_fn: iter_free_fn,
+                    element_type: start_ty, // Elements of range have same type as start
                 },
-            );
-
-            // Create basic blocks
-            let cond_bb = self.context.append_basic_block(function, "for_cond");
-            let body_bb = self.context.append_basic_block(function, "for_body");
-            let cleanup_bb = self.context.append_basic_block(function, "for_cleanup");
-            let exit_bb = self.context.append_basic_block(function, "for_exit");
-
-            self.builder.build_unconditional_branch(cond_bb)?;
-
-            // Condition: has_next(iter)
-            self.builder.position_at_end(cond_bb);
-            let has_next = self
-                .builder
-                .build_call(iter_has_next_fn, &[iter_ptr.into()], "has_next")?
-                .try_as_basic_value()
-                .left()
-                .unwrap()
-                .into_int_value();
-
-            self.builder
-                .build_conditional_branch(has_next, body_bb, cleanup_bb)?;
-
-            // Body
-            self.builder.position_at_end(body_bb);
-
-            // Get next value and store in loop variable
-            let next_val = self
-                .builder
-                .build_call(iter_next_fn, &[iter_ptr.into()], "next")?
-                .try_as_basic_value()
-                .left()
-                .unwrap();
-
-            self.builder.build_store(loop_var_alloca, next_val)?;
-
-            // Execute loop body
-            ctx.push_loop(cond_bb, cleanup_bb);
-            self.lower_block(body, function, ctx)?;
-            ctx.pop_loop();
-
-            if self
-                .builder
-                .get_insert_block()
-                .and_then(|b| b.get_terminator())
-                .is_none()
-            {
-                self.builder.build_unconditional_branch(cond_bb)?;
-            }
-
-            // Cleanup: free iterator
-            self.builder.position_at_end(cleanup_bb);
-            self.builder
-                .build_call(iter_free_fn, &[iter_ptr.into()], "")?;
-            self.builder.build_unconditional_branch(exit_bb)?;
-
-            self.builder.position_at_end(exit_bb);
+            )?;
+            
             Ok(())
         } else {
-            // TEMP DEBUG
-            eprintln!("iterable ty: {:?}", self.expr_type(iterable));
             // Handle other iterable types (arrays, strings, etc.)
             let iterable_val = self.eval_expr(iterable, ctx)?;
             let iterable_ty = iterable_val.ty.clone();
@@ -440,7 +356,7 @@ impl<'ctx> Compiler<'ctx> {
                             has_next_fn: iter_has_next_fn,
                             next_fn: iter_next_fn,
                             free_fn: iter_free_fn,
-                            element_type: OtterType::I64,
+                            element_type: OtterType::Str, // Each character is a string
                         },
                     )
                 }
@@ -568,8 +484,10 @@ impl<'ctx> Compiler<'ctx> {
             .left()
             .ok_or_else(|| anyhow::anyhow!("next element failed"))?;
 
-        // Store element in variable (convert raw i64 payloads to the expected type)
-        if let Some(value) = self.prepare_iter_element_for_store(element_val, &element_ty)? {
+        // Decode the runtime type tag and convert to the correct type
+        // The runtime now returns tagged values: upper 8 bits = type tag, lower 56 bits = data
+        let decoded_value = self.decode_and_convert_tagged_value(element_val, &element_ty)?;
+        if let Some(value) = decoded_value {
             self.builder.build_store(var_alloca, value)?;
         }
 
@@ -603,10 +521,8 @@ impl<'ctx> Compiler<'ctx> {
     // Exception handling (try/except/finally/raise) removed - use Result<T, E> pattern matching instead
     fn list_element_type(&self, iterable: &Expr) -> Option<OtterType> {
         if let Some(ty) = self.expr_type(iterable) {
-            eprintln!("expr type: {:?}", ty);
             self.resolve_list_element_type_from_typeinfo(ty)
         } else {
-            eprintln!("expr type missing for iterable");
             None
         }
     }
@@ -621,7 +537,7 @@ impl<'ctx> Compiler<'ctx> {
         }
     }
 
-    fn typeinfo_to_otter_type(&self, ty: &TypeInfo) -> Option<OtterType> {
+    pub(crate) fn typeinfo_to_otter_type(&self, ty: &TypeInfo) -> Option<OtterType> {
         match ty {
             TypeInfo::Unit => Some(OtterType::Unit),
             TypeInfo::Bool => Some(OtterType::Bool),
@@ -637,6 +553,102 @@ impl<'ctx> Compiler<'ctx> {
         }
     }
 
+    fn decode_and_convert_tagged_value(
+        &mut self,
+        encoded_value: BasicValueEnum<'ctx>,
+        expected_type: &OtterType,
+    ) -> Result<Option<BasicValueEnum<'ctx>>> {
+        // Runtime values are encoded with type information in upper 8 bits
+        // and either the direct value or a handle to full-precision data in lower 56 bits
+        // Type tags: 0=Unit, 1=Bool, 2=I64, 3=F64, 4=String, 5=List, 6=Map
+        
+        let encoded_int = encoded_value.into_int_value();
+        
+        // Call the appropriate runtime decode function based on expected type
+        match expected_type {
+            OtterType::Unit => Ok(None),
+            
+            OtterType::Bool => {
+                let decode_fn = self.get_or_declare_ffi_function("__otter_decode_value_as_bool")?;
+                let result = self.builder.build_call(
+                    decode_fn,
+                    &[encoded_int.into()],
+                    "decoded_bool",
+                )?;
+                Ok(Some(result.try_as_basic_value().left().unwrap()))
+            }
+            
+            OtterType::I64 => {
+                let decode_fn = self.get_or_declare_ffi_function("__otter_decode_value_as_i64")?;
+                let result = self.builder.build_call(
+                    decode_fn,
+                    &[encoded_int.into()],
+                    "decoded_i64",
+                )?;
+                Ok(Some(result.try_as_basic_value().left().unwrap()))
+            }
+            
+            OtterType::F64 => {
+                let decode_fn = self.get_or_declare_ffi_function("__otter_decode_value_as_f64")?;
+                let result = self.builder.build_call(
+                    decode_fn,
+                    &[encoded_int.into()],
+                    "decoded_f64",
+                )?;
+                Ok(Some(result.try_as_basic_value().left().unwrap()))
+            }
+            
+            OtterType::Str => {
+                let decode_fn = self.get_or_declare_ffi_function("__otter_decode_value_as_string")?;
+                let result = self.builder.build_call(
+                    decode_fn,
+                    &[encoded_int.into()],
+                    "decoded_string",
+                )?;
+                Ok(Some(result.try_as_basic_value().left().unwrap()))
+            }
+            
+            OtterType::List | OtterType::Map | OtterType::Opaque => {
+                let decode_fn = self.get_or_declare_ffi_function("__otter_decode_value_as_handle")?;
+                let result = self.builder.build_call(
+                    decode_fn,
+                    &[encoded_int.into()],
+                    "decoded_handle",
+                )?;
+                Ok(Some(result.try_as_basic_value().left().unwrap()))
+            }
+            
+            OtterType::I32 => {
+                let decode_fn = self.get_or_declare_ffi_function("__otter_decode_value_as_i64")?;
+                let result = self.builder.build_call(
+                    decode_fn,
+                    &[encoded_int.into()],
+                    "decoded_i64",
+                )?;
+                let i64_val = result.try_as_basic_value().left().unwrap().into_int_value();
+                Ok(Some(self.builder.build_int_truncate(
+                    i64_val,
+                    self.context.i32_type(),
+                    "truncated_i32",
+                )?.into()))
+            }
+            
+            OtterType::Struct(_) | OtterType::Tuple(_) => {
+                // WARNING: Structs and tuples are currently handled as opaque handles.
+                // If the compiler expects a StructType (by value), this may be incorrect.
+                // TODO: Implement proper struct decoding/deserialization from handle.
+                let decode_fn = self.get_or_declare_ffi_function("__otter_decode_value_as_handle")?;
+                let result = self.builder.build_call(
+                    decode_fn,
+                    &[encoded_int.into()],
+                    "decoded_handle",
+                )?;
+                Ok(Some(result.try_as_basic_value().left().unwrap()))
+            }
+        }
+    }
+    
+    #[allow(dead_code)]
     fn prepare_iter_element_for_store(
         &mut self,
         raw_value: BasicValueEnum<'ctx>,
@@ -653,8 +665,11 @@ impl<'ctx> Compiler<'ctx> {
                     .into()
             }
             OtterType::F64 => {
+                // raw_value is an i64 containing the bit pattern of an f64
+                // We need to bitcast i64 -> f64
+                let int_val = raw_value.into_int_value();
                 self.builder
-                    .build_bit_cast(raw_value, self.context.f64_type(), "iter_f64")?
+                    .build_bit_cast(int_val, self.context.f64_type(), "iter_f64")?
             }
             OtterType::Bool => {
                 let int_val = raw_value.into_int_value();

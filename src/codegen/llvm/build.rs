@@ -37,15 +37,29 @@ fn check_library_available(lib_name: &str) -> bool {
         "/lib",
         "/lib64",
         "/usr/lib64",
+        "/usr/lib/x86_64-linux-gnu",
+        "/usr/lib/aarch64-linux-gnu",
     ];
 
     for path in &common_paths {
         let lib_file = format!("lib{}.so", lib_name);
         let lib_file_a = format!("lib{}.a", lib_name);
+        
         if Path::new(path).join(&lib_file).exists()
             || Path::new(path).join(&lib_file_a).exists()
         {
             return true;
+        }
+        
+        // Check for versioned .so files
+        if let Ok(entries) = fs::read_dir(path) {
+            for entry in entries.flatten() {
+                if let Some(name) = entry.file_name().to_str() {
+                    if name.starts_with(&format!("lib{}.so", lib_name)) {
+                        return true;
+                    }
+                }
+            }
         }
     }
 
@@ -412,19 +426,22 @@ pub fn build_executable(
                 .arg("-ldl")
                 .arg("-lpthread")
                 .arg("-lz")
-                .arg("-lxml2");
+                .arg("-lxml2")
+                .arg("-lffi")
+                .arg("-lzstd");
             
-            // Try to link libedit, but fallback to libreadline or skip if neither is available
+            // LLVM's LineEditor requires libedit, try to link it
+            // If not available, try readline which provides compatible history functions
             if check_library_available("edit") {
                 cc.arg("-ledit");
             } else if check_library_available("readline") {
                 cc.arg("-lreadline");
+            } else {
+                // Try both anyway - let the linker fail with a clear error if neither is installed
+                cc.arg("-ledit");
             }
-            // If neither is available, skip - the runtime should still work
             
-            cc.arg("-lffi")
-                .arg("-lzstd")
-                .arg("-ltinfo");
+            cc.arg("-ltinfo");
         }
     }
 
@@ -729,19 +746,22 @@ pub fn build_shared_library(
                 .arg("-ldl")
                 .arg("-lpthread")
                 .arg("-lz")
-                .arg("-lxml2");
+                .arg("-lxml2")
+                .arg("-lffi")
+                .arg("-lzstd");
             
-            // Try to link libedit, but fallback to libreadline or skip if neither is available
+            // LLVM's LineEditor requires libedit, try to link it
+            // If not available, try readline which provides compatible history functions
             if check_library_available("edit") {
                 cc.arg("-ledit");
             } else if check_library_available("readline") {
                 cc.arg("-lreadline");
+            } else {
+                // Try both anyway - let the linker fail with a clear error if neither is installed
+                cc.arg("-ledit");
             }
-            // If neither is available, skip - the runtime should still work
             
-            cc.arg("-lffi")
-                .arg("-lzstd")
-                .arg("-ltinfo");
+            cc.arg("-ltinfo");
         }
     }
 

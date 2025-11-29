@@ -26,6 +26,8 @@ jobs:
           sudo apt-get install -y llvm-18 llvm-18-dev clang-18 || true
           # Try to install Polly if available (may not exist in all repos)
           sudo apt-get install -y libpolly-18-dev 2>/dev/null || echo "Polly not available in repo"
+          # Install libedit for LLVM's LineEditor support
+          sudo apt-get install -y libedit-dev || echo "libedit-dev not available, trying alternatives"
           echo "LLVM_SYS_181_PREFIX=/usr/lib/llvm-18" >> $GITHUB_ENV
           echo "LD_LIBRARY_PATH=/usr/lib/llvm-18/lib:${LD_LIBRARY_PATH:-}" >> $GITHUB_ENV
           # Set library search path for linker
