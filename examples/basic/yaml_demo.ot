@@ -1,0 +1,28 @@
+use yaml
+
+fn main():
+    let doc = """
+    name: Otter
+    features:
+      - async
+      - ffi
+      - jit
+    """
+
+    println("Original YAML:")
+    println(doc)
+
+    let normalized = yaml.normalize(doc)
+    println("\nNormalized YAML:")
+    println(normalized)
+
+    let json = yaml.to_json(doc)
+    println("\nAs JSON:")
+    println(json)
+
+    let back = yaml.from_json(json)
+    println("\nBack to YAML:")
+    println(back)
+
+    let valid = yaml.validate(doc)
+    println(f"Valid: {valid}")

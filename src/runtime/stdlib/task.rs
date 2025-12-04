@@ -574,6 +574,8 @@ fn register_std_task_symbols(registry: &SymbolRegistry) {
 
 inventory::submit! {
     crate::runtime::ffi::SymbolProvider {
+        namespace: "task",
+        autoload: false,
         register: register_std_task_symbols,
     }
 }

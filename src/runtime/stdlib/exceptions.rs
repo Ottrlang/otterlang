@@ -489,6 +489,8 @@ fn register_exception_runtime_symbols(registry: &SymbolRegistry) {
 
 inventory::submit! {
     crate::runtime::ffi::SymbolProvider {
+        namespace: "exceptions",
+        autoload: true,
         register: register_exception_runtime_symbols,
     }
 }

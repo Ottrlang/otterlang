@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fmt;
 
 use abi_stable::StableAbi;
@@ -91,12 +92,25 @@ pub struct FfiFunction {
     pub signature: FfiSignature,
 }
 
-#[derive(Default)]
+type ModuleRegistrar = fn(&SymbolRegistry);
+
 pub struct SymbolRegistry {
     functions: RwLock<AHashMap<String, FfiFunction>>,
+    lazy_modules: RwLock<AHashMap<String, Vec<ModuleRegistrar>>>,
+    active_modules: RwLock<HashSet<String>>,
 }
 
 pub static GLOBAL_SYMBOL_REGISTRY: Lazy<SymbolRegistry> = Lazy::new(SymbolRegistry::default);
+
+impl Default for SymbolRegistry {
+    fn default() -> Self {
+        Self {
+            functions: RwLock::new(AHashMap::new()),
+            lazy_modules: RwLock::new(AHashMap::new()),
+            active_modules: RwLock::new(HashSet::new()),
+        }
+    }
+}
 
 impl SymbolRegistry {
     pub fn new() -> Self {
@@ -121,6 +135,47 @@ impl SymbolRegistry {
         for function in functions {
             guard.insert(function.name.clone(), function);
         }
+    }
+
+    pub fn register_lazy_module(&self, name: impl Into<String>, registrar: ModuleRegistrar) {
+        let mut modules = self.lazy_modules.write();
+        modules.entry(name.into()).or_default().push(registrar);
+    }
+
+    pub fn mark_module_active(&self, name: impl Into<String>) {
+        self.active_modules.write().insert(name.into());
+    }
+
+    pub fn activate_module(&self, name: &str) -> bool {
+        if self.is_module_active(name) {
+            return false;
+        }
+
+        let registrars = {
+            let mut modules = self.lazy_modules.write();
+            modules.remove(name)
+        };
+
+        if let Some(registrars) = registrars {
+            {
+                let mut active = self.active_modules.write();
+                active.insert(name.to_string());
+            }
+            for registrar in registrars {
+                (registrar)(self);
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn has_module(&self, name: &str) -> bool {
+        self.is_module_active(name) || self.lazy_modules.read().contains_key(name)
+    }
+
+    pub fn is_module_active(&self, name: &str) -> bool {
+        self.active_modules.read().contains(name)
     }
 
     pub fn contains(&self, name: &str) -> bool {

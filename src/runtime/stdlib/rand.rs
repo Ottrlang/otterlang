@@ -159,6 +159,8 @@ fn register_std_rand_symbols(registry: &SymbolRegistry) {
 
 inventory::submit! {
     crate::runtime::ffi::SymbolProvider {
+        namespace: "rand",
+        autoload: false,
         register: register_std_rand_symbols,
     }
 }

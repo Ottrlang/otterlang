@@ -1,0 +1,10 @@
+use http
+
+fn main():
+    let url = "https://worldtimeapi.org/api/timezone/Etc/UTC"
+    let status = http.head(url)
+    println(f"Status: {status}")
+
+    let body = http.get(url)
+    println("Body:")
+    println(body)

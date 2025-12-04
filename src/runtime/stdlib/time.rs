@@ -336,6 +336,8 @@ fn register_std_time_symbols(registry: &SymbolRegistry) {
 
 inventory::submit! {
     crate::runtime::ffi::SymbolProvider {
+        namespace: "time",
+        autoload: false,
         register: register_std_time_symbols,
     }
 }

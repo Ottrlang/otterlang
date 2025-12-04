@@ -194,6 +194,8 @@ fn register_string_functions(registry: &SymbolRegistry) {
 
 inventory::submit! {
     crate::runtime::ffi::SymbolProvider {
+        namespace: "strings",
+        autoload: true,
         register: register_string_functions,
     }
 }

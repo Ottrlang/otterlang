@@ -385,6 +385,8 @@ pub use core.Option
 pub use math.sqrt as square_root
 ```
 
+Only the built-in primitives (enums, `Option`/`Result`, `panic`, `print`, `len`, and the core String/List/Map helpers plus arithmetic) live in the implicit prelude. Every other stdlib module—`http`, `json`, `io`, `sys`, `net`, `runtime`, `task`, etc.—must be imported with `use module_name` before its dotted members (`module.fn`) become visible.
+
 Module paths consist of segments separated by `/` or `:` (`use std/io`) and may start with `.` or `..` for relative imports. Transparent Rust FFI uses the same mechanism (`use rust:serde/json`).
 
 `pub use` statements re-export items or entire modules. `pub use math` re-exports everything that `math` already exposes as `pub`.

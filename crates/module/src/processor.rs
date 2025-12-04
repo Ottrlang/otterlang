@@ -6,6 +6,27 @@ use crate::{Module, ModuleLoader, ModulePath, ModuleResolver};
 use ast::nodes::{Program, Statement};
 const DEFAULT_MODULES: &[&str] = &["otter:core"];
 
+const VIRTUAL_STDLIB_MODULES: &[&str] = &[
+    "http",
+    "json",
+    "yaml",
+    "math",
+    "rand",
+    "net",
+    "io",
+    "fmt",
+    "runtime",
+    "task",
+    "sys",
+    "sync",
+    "time",
+    "test",
+    "enums",
+    "exceptions",
+    "strings",
+    "builtins",
+];
+
 /// Processes module imports and loads dependencies
 pub struct ModuleProcessor {
     loader: ModuleLoader,
@@ -37,6 +58,9 @@ impl ModuleProcessor {
             if let Statement::Use { imports } = statement.as_ref() {
                 for import in imports {
                     let module = &import.as_ref().module;
+                    if Self::is_virtual_module(module) {
+                        continue;
+                    }
                     let module_path = ModulePath::from_string(module, &self.source_dir)?;
 
                     match module_path {
@@ -102,6 +126,9 @@ impl ModuleProcessor {
             if let Statement::Use { imports } = statement.as_ref() {
                 for import in imports {
                     let module = &import.as_ref().module;
+                    if Self::is_virtual_module(module) {
+                        continue;
+                    }
                     let module_dir = module_path.parent().unwrap_or(Path::new("."));
                     let module_path_enum = ModulePath::from_string(module, module_dir)?;
 
@@ -250,6 +277,15 @@ impl ModuleProcessor {
             .as_ref()
             .map(|dir| path.starts_with(dir))
             .unwrap_or(false)
+    }
+
+    fn is_virtual_module(module: &str) -> bool {
+        let namespace_split = module.split(':').last().unwrap_or(module);
+        let candidate = namespace_split
+            .rsplit(['/', '.'])
+            .next()
+            .unwrap_or(namespace_split);
+        VIRTUAL_STDLIB_MODULES.contains(&candidate)
     }
 }
 

@@ -393,6 +393,8 @@ fn register_std_net_symbols(registry: &SymbolRegistry) {
 
 inventory::submit! {
     crate::runtime::ffi::SymbolProvider {
+        namespace: "net",
+        autoload: false,
         register: register_std_net_symbols,
     }
 }

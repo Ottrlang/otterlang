@@ -271,6 +271,8 @@ fn register_enum_functions(registry: &SymbolRegistry) {
 
 inventory::submit! {
     crate::runtime::ffi::SymbolProvider {
+        namespace: "runtime.enum",
+        autoload: true,
         register: register_enum_functions,
     }
 }

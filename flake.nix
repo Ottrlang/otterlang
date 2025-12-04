@@ -73,6 +73,11 @@
 
             CARGO_PROFILE_DEV_CODEGEN_BACKEND = (if hasInfix "linux" system then "cranelift" else "llvm");
             CARGO_NET_GIT_FETCH_WITH_CLI = "true";
+            shellHook = ''
+              if [ -z "''${OTTER_DEV_AUTOUPDATE:-}" ]; then
+                export OTTER_DEV_AUTOUPDATE="$PWD"
+              fi
+            '';
           };
       }
     );

@@ -132,6 +132,7 @@ pub enum Command {
 
 pub fn run() -> Result<()> {
     logger::init_logging();
+    maybe_auto_update()?;
     ffi::bootstrap_stdlib();
     let cli = OtterCli::parse();
 
@@ -150,6 +151,74 @@ pub fn run() -> Result<()> {
             update_snapshots,
         } => handle_test(&cli, paths, *parallel, *verbose, *update_snapshots),
     }
+}
+
+fn maybe_auto_update() -> Result<()> {
+    let source_dir = match std::env::var("OTTER_DEV_AUTOUPDATE") {
+        Ok(val) if val == "0" || val.eq_ignore_ascii_case("false") => return Ok(()),
+        Ok(path) if !path.is_empty() => PathBuf::from(path),
+        _ => return Ok(()),
+    };
+
+    let cargo_toml = source_dir.join("Cargo.toml");
+    if !cargo_toml.exists() {
+        warn!(
+            "OTTER_DEV_AUTOUPDATE is set but {} is missing; skipping auto-install",
+            cargo_toml.display()
+        );
+        return Ok(());
+    }
+
+    let cargo_lock = source_dir.join("Cargo.lock");
+    let lock_mtime = cargo_lock
+        .metadata()
+        .and_then(|meta| meta.modified())
+        .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+
+    let stamp_path = source_dir.join(".otter/cli-autoupdate.stamp");
+    fs::create_dir_all(stamp_path.parent().unwrap())?;
+
+    let mut needs_install = true;
+    if let Ok(contents) = fs::read_to_string(&stamp_path) {
+        if let Ok(prev) = contents.trim().parse::<u128>() {
+            let current = lock_mtime
+                .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                .map(|d| d.as_millis())
+                .unwrap_or(0);
+            if current <= prev {
+                needs_install = false;
+            }
+        }
+    }
+
+    if !needs_install {
+        return Ok(());
+    }
+
+    info!(
+        "Auto-updating otter CLI from {} (set OTTER_DEV_AUTOUPDATE=0 to disable)",
+        source_dir.display()
+    );
+
+    let status = ProcessCommand::new("cargo")
+        .arg("install")
+        .arg("--path")
+        .arg(&source_dir)
+        .arg("--force")
+        .status()
+        .with_context(|| "failed to spawn cargo install for auto-update")?;
+
+    if !status.success() {
+        warn!("cargo install exited with status {status:?}; continuing without updating");
+        return Ok(());
+    }
+
+    let millis = lock_mtime
+        .duration_since(std::time::SystemTime::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    fs::write(&stamp_path, format!("{}\n", millis))?;
+    Ok(())
 }
 
 fn handle_run(cli: &OtterCli, path: &Path) -> Result<()> {

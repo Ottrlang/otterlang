@@ -305,6 +305,8 @@ fn register_std_math_symbols(registry: &SymbolRegistry) {
 
 inventory::submit! {
     crate::runtime::ffi::SymbolProvider {
+        namespace: "math",
+        autoload: false,
         register: register_std_math_symbols,
     }
 }

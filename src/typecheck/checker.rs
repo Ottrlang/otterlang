@@ -5,8 +5,9 @@ use crate::runtime::symbol_registry::{FfiType, SymbolRegistry};
 use crate::typecheck::types::{EnumDefinition, EnumLayout, TypeContext, TypeError, TypeInfo};
 use ast::nodes::{
     BinaryOp, Block, Expr, FStringPart, Function, Literal, Node, Pattern, Program, Statement, Type,
-    UnaryOp,
+    UnaryOp, UseImport,
 };
+use common::Span;
 use language::LanguageFeatureFlags;
 
 /// Type checker that validates and infers types in OtterLang programs
@@ -133,36 +134,11 @@ impl TypeChecker {
                 return_type: Box::new(TypeInfo::Unit),
             },
         );
-
-        // Common math functions (from math module)
-        for func_name in &[
-            "abs", "sqrt", "pow", "exp", "log", "sin", "cos", "tan", "floor", "ceil", "round",
-        ] {
-            context.functions.insert(
-                func_name.to_string(),
-                TypeInfo::Function {
-                    params: vec![TypeInfo::F64],
-                    param_defaults: vec![false],
-                    return_type: Box::new(TypeInfo::F64),
-                },
-            );
-        }
-
-        // min/max with two parameters
-        for func_name in &["min", "max"] {
-            context.functions.insert(
-                func_name.to_string(),
-                TypeInfo::Function {
-                    params: vec![TypeInfo::F64, TypeInfo::F64],
-                    param_defaults: vec![false, false],
-                    return_type: Box::new(TypeInfo::F64),
-                },
-            );
-        }
     }
 
     /// Type check a program
     pub fn check_program(&mut self, program: &Program) -> Result<()> {
+        self.register_module_imports(&program.statements);
         // First pass: collect struct definitions, enums, and type aliases
         self.register_type_definitions(&program.statements);
 
@@ -298,6 +274,66 @@ impl TypeChecker {
         self.register_type_definitions(&program.statements);
     }
 
+    fn register_module_imports(&mut self, statements: &[Node<Statement>]) {
+        for statement in statements {
+            if let Statement::Use { imports } = statement.as_ref() {
+                for import in imports {
+                    self.try_register_module(import);
+                }
+            }
+        }
+    }
+
+    fn try_register_module(&mut self, import: &Node<UseImport>) {
+        let Some(registry) = self.registry else {
+            return;
+        };
+
+        let Some(module_name) = Self::canonical_module_name(&import.as_ref().module) else {
+            return;
+        };
+
+        if !registry.has_module(&module_name) {
+            return;
+        }
+
+        registry.activate_module(&module_name);
+        let alias = import
+            .as_ref()
+            .alias
+            .clone()
+            .unwrap_or_else(|| module_name.clone());
+        self.context
+            .insert_variable(alias, TypeInfo::Module(module_name));
+    }
+
+    fn canonical_module_name(module: &str) -> Option<String> {
+        if module.starts_with("rust:") {
+            return None;
+        }
+
+        let candidate = module.split(':').last().unwrap_or(module);
+        if candidate.starts_with('.') || candidate.starts_with('/') {
+            return None;
+        }
+
+        if candidate.contains('/') || candidate.contains('\\') {
+            return None;
+        }
+
+        let trimmed = candidate.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+
+        let canonical = trimmed.rsplit('.').next().unwrap_or(trimmed);
+        if canonical.is_empty() {
+            None
+        } else {
+            Some(canonical.to_string())
+        }
+    }
+
     fn register_type_definitions(&mut self, statements: &[Node<Statement>]) {
         for statement in statements {
             match statement.as_ref() {
@@ -367,8 +403,9 @@ impl TypeChecker {
         };
 
         let mut fn_context = TypeContext::with_features(self.features.clone());
+        fn_context.variables = self.context.variables.clone();
 
-        // Add function parameters to context
+        // Add function parameters to context, overriding any globals/imports
         for param in &function.as_ref().params {
             let param_type = if let Some(ty) = &param.as_ref().ty {
                 self.context.type_from_annotation(ty)
@@ -1190,26 +1227,21 @@ impl TypeChecker {
                 Expr::Identifier(name) => {
                     if let Some(var_type) = self.context.get_variable(name) {
                         Ok(var_type.clone())
-                    } else if let Some(registry) = self.registry {
-                        if registry
-                            .all()
-                            .iter()
-                            .any(|f| f.name.starts_with(&format!("{}.", name)))
-                        {
-                            Ok(TypeInfo::Module(name.clone()))
-                        } else {
-                            self.errors.push(
-                                TypeError::new(format!("undefined variable: {}", name))
-                                    .with_hint(format!(
-                                        "did you mean to declare it with `let {}`?",
-                                        name
-                                    ))
-                                    .with_help("Variables must be declared before use".to_string())
-                                    .with_span(*span),
-                            );
-                            Ok(TypeInfo::Error)
-                        }
                     } else {
+                        if let Some(registry) = self.registry {
+                            if registry.has_module(name) {
+                                self.errors.push(
+                                    TypeError::new(format!("module `{}` is not imported", name))
+                                        .with_hint(format!(
+                                            "add `use {}` at the top of the file",
+                                            name
+                                        ))
+                                        .with_span(*span),
+                                );
+                                return Ok(TypeInfo::Error);
+                            }
+                        }
+
                         self.errors.push(
                             TypeError::new(format!("undefined variable: {}", name))
                                 .with_hint(format!(
@@ -1420,68 +1452,27 @@ impl TypeChecker {
                                     } else {
                                         ffi_type_to_typeinfo(&symbol.signature.result)
                                     };
-                                    return Ok(TypeInfo::Function {
+                                    TypeInfo::Function {
                                         params,
                                         param_defaults: vec![false; symbol.signature.params.len()],
                                         return_type: Box::new(return_type),
-                                    });
+                                    }
+                                } else {
+                                    self.context
+                                        .get_function(&full_name)
+                                        .cloned()
+                                        .unwrap_or_else(|| {
+                                            self.resolve_member_function(object, field, span)
+                                        })
                                 }
-
-                                // Check if this is a nested module path (e.g., rand.rngs)
-                                if registry
-                                    .all()
-                                    .iter()
-                                    .any(|f| f.name.starts_with(&format!("{}.", full_name)))
-                                {
-                                    return Ok(TypeInfo::Module(full_name));
-                                }
+                            } else {
+                                self.context
+                                    .get_function(&full_name)
+                                    .cloned()
+                                    .unwrap_or_else(|| {
+                                        self.resolve_member_function(object, field, span)
+                                    })
                             }
-
-                            // Fall back to context functions
-                            self.context
-                                .get_function(&full_name)
-                                .cloned()
-                                .unwrap_or_else(|| {
-                                    // Check if object is a module type
-                                    if let Ok(obj_type) = self.infer_expr_type(object)
-                                        && let TypeInfo::Module(_) = obj_type
-                                    {
-                                        // This is a module member access, return a generic function type
-                                        return TypeInfo::Function {
-                                            params: vec![],
-                                            param_defaults: vec![],
-                                            return_type: Box::new(TypeInfo::Unknown),
-                                        };
-                                    }
-
-                                    // Method call: obj.method() - infer object type and look up method
-                                    if let Ok(obj_type) = self.infer_expr_type(object)
-                                        && let TypeInfo::Struct { name, .. } = obj_type
-                                    {
-                                        let method_name = format!("{}.{}", name, field);
-                                        return self
-                                            .context
-                                            .get_function(&method_name)
-                                            .cloned()
-                                            .unwrap_or_else(|| {
-                                                self.errors.push(
-                                                    TypeError::new(format!(
-                                                        "struct '{}' has no method '{}'",
-                                                        name, field
-                                                    ))
-                                                    .with_span(*span),
-                                                );
-                                                TypeInfo::Error
-                                            });
-                                    }
-
-                                    // Return a generic function type for unknown FFI functions
-                                    TypeInfo::Function {
-                                        params: vec![],
-                                        param_defaults: vec![],
-                                        return_type: Box::new(TypeInfo::Unknown),
-                                    }
-                                })
                         }
                         _ => {
                             self.errors.push(
@@ -2302,7 +2293,17 @@ impl TypeChecker {
 
     fn build_member_path(&self, object: &Node<Expr>, field: &str) -> String {
         match object.as_ref() {
-            Expr::Identifier(name) => format!("{}.{}", name, field),
+            Expr::Identifier(name) => {
+                let canonical = self
+                    .context
+                    .get_variable(name)
+                    .and_then(|ty| match ty {
+                        TypeInfo::Module(module_name) => Some(module_name.clone()),
+                        _ => None,
+                    })
+                    .unwrap_or_else(|| name.clone());
+                format!("{}.{}", canonical, field)
+            }
             Expr::Member {
                 object: inner_obj,
                 field: inner_field,
@@ -2311,6 +2312,39 @@ impl TypeChecker {
                 format!("{}.{}", prefix, field)
             }
             _ => format!("unknown.{}", field),
+        }
+    }
+
+    fn resolve_member_function(
+        &mut self,
+        object: &Node<Expr>,
+        field: &str,
+        span: &Span,
+    ) -> TypeInfo {
+        match self.infer_expr_type(object) {
+            Ok(TypeInfo::Module(_)) => TypeInfo::Function {
+                params: vec![],
+                param_defaults: vec![],
+                return_type: Box::new(TypeInfo::Unknown),
+            },
+            Ok(TypeInfo::Struct { name, .. }) => {
+                let method_name = format!("{}.{}", name, field);
+                self.context
+                    .get_function(&method_name)
+                    .cloned()
+                    .unwrap_or_else(|| {
+                        self.errors.push(
+                            TypeError::new(format!("struct '{}' has no method '{}'", name, field))
+                                .with_span(*span),
+                        );
+                        TypeInfo::Error
+                    })
+            }
+            _ => TypeInfo::Function {
+                params: vec![],
+                param_defaults: vec![],
+                return_type: Box::new(TypeInfo::Unknown),
+            },
         }
     }
 }

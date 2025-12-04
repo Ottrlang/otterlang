@@ -2224,6 +2224,8 @@ pub extern "C" fn main(_argc: i32, _argv: *const *const c_char) -> i32 {
 
 inventory::submit! {
     crate::runtime::ffi::SymbolProvider {
+        namespace: "builtins",
+        autoload: true,
         register: register_builtin_symbols,
     }
 }

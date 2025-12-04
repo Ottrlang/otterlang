@@ -517,6 +517,20 @@ pub unsafe extern "C" fn otter_std_io_file_size(path: *const c_char) -> i64 {
     }
 }
 
+fn register_io_prelude_symbols(registry: &SymbolRegistry) {
+    let sig = FfiSignature::new(vec![FfiType::Str], FfiType::Unit);
+    registry.register(FfiFunction {
+        name: "print".into(),
+        symbol: "otter_std_io_print".into(),
+        signature: sig.clone(),
+    });
+    registry.register(FfiFunction {
+        name: "println".into(),
+        symbol: "otter_std_io_println".into(),
+        signature: sig,
+    });
+}
+
 fn register_std_io_symbols(registry: &SymbolRegistry) {
     registry.register(FfiFunction {
         name: "std.io.print".into(),
@@ -525,19 +539,7 @@ fn register_std_io_symbols(registry: &SymbolRegistry) {
     });
 
     registry.register(FfiFunction {
-        name: "print".into(),
-        symbol: "otter_std_io_print".into(),
-        signature: FfiSignature::new(vec![FfiType::Str], FfiType::Unit),
-    });
-
-    registry.register(FfiFunction {
         name: "std.io.println".into(),
-        symbol: "otter_std_io_println".into(),
-        signature: FfiSignature::new(vec![FfiType::Str], FfiType::Unit),
-    });
-
-    registry.register(FfiFunction {
-        name: "println".into(),
         symbol: "otter_std_io_println".into(),
         signature: FfiSignature::new(vec![FfiType::Str], FfiType::Unit),
     });
@@ -677,6 +679,16 @@ fn register_std_io_symbols(registry: &SymbolRegistry) {
 
 inventory::submit! {
     crate::runtime::ffi::SymbolProvider {
+        namespace: "io_prelude",
+        autoload: true,
+        register: register_io_prelude_symbols,
+    }
+}
+
+inventory::submit! {
+    crate::runtime::ffi::SymbolProvider {
+        namespace: "io",
+        autoload: false,
         register: register_std_io_symbols,
     }
 }

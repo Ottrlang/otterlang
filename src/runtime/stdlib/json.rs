@@ -87,6 +87,8 @@ fn register_std_json_symbols(registry: &SymbolRegistry) {
 
 inventory::submit! {
     crate::runtime::ffi::SymbolProvider {
+        namespace: "json",
+        autoload: false,
         register: register_std_json_symbols,
     }
 }

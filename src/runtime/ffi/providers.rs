@@ -4,6 +4,8 @@ use crate::runtime::symbol_registry::SymbolRegistry;
 
 #[derive(Clone, Copy)]
 pub struct SymbolProvider {
+    pub namespace: &'static str,
+    pub autoload: bool,
     pub register: fn(&SymbolRegistry),
 }
 
@@ -11,7 +13,12 @@ inventory::collect!(crate::runtime::ffi::providers::SymbolProvider);
 
 fn register_builtin_symbols(registry: &SymbolRegistry) {
     for provider in inventory::iter::<SymbolProvider> {
-        (provider.register)(registry);
+        if provider.autoload {
+            registry.mark_module_active(provider.namespace);
+            (provider.register)(registry);
+        } else {
+            registry.register_lazy_module(provider.namespace, provider.register);
+        }
     }
 }
 

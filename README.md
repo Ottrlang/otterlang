@@ -78,6 +78,8 @@ The compiler shells out to `cargo`/rustdoc, normalizes the crate’s public API,
 
 Built-in modules cover IO, math, JSON, tasks, runtime helpers, strings, networking, testing, and more. The [API Reference](docs/API_REFERENCE.md) documents every exported function.
 
+ Only the true language primitives (enums, `Option`/`Result`, `panic`, `print`, `len`, strings, lists, maps, and arithmetic) live in the implicit prelude. All other stdlib functionality now follows a Python-style import model—`use http`, `use yaml`, `use task`, etc.—and nothing outside the prelude is visible until you import the module you need.
+
 
 ## Command Line Interface
 

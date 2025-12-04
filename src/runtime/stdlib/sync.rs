@@ -290,6 +290,8 @@ fn register_std_sync_symbols(registry: &SymbolRegistry) {
 
 inventory::submit! {
     crate::runtime::ffi::SymbolProvider {
+        namespace: "sync",
+        autoload: false,
         register: register_std_sync_symbols,
     }
 }

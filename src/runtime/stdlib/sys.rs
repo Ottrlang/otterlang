@@ -89,6 +89,8 @@ fn register_std_sys_symbols(registry: &SymbolRegistry) {
 
 inventory::submit! {
     crate::runtime::ffi::SymbolProvider {
+        namespace: "sys",
+        autoload: false,
         register: register_std_sys_symbols,
     }
 }

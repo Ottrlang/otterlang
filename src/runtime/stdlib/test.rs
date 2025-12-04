@@ -296,6 +296,8 @@ fn register_std_test_symbols(registry: &SymbolRegistry) {
 
 inventory::submit! {
     crate::runtime::ffi::SymbolProvider {
+        namespace: "test",
+        autoload: false,
         register: register_std_test_symbols,
     }
 }

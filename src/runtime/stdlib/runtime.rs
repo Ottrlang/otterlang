@@ -475,6 +475,8 @@ fn register_std_runtime_symbols(registry: &SymbolRegistry) {
 
 inventory::submit! {
     crate::runtime::ffi::SymbolProvider {
+        namespace: "runtime",
+        autoload: false,
         register: register_std_runtime_symbols,
     }
 }

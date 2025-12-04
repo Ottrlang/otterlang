@@ -2,6 +2,8 @@
 
 Complete API reference for OtterLang standard library functions and types.
 
+> **Importing modules**: Only the prelude primitives (`print`, `panic`, `len`, strings/lists/maps, enums/Option/Result, arithmetic) are injected automatically. Every other module documented here must be imported explicitly with `use module_name` (e.g. `use http`, `use json as js`) before its dotted members can be referenced.
+
 ## Table of Contents
 
 - [Built-in Functions](#built-in-functions)
