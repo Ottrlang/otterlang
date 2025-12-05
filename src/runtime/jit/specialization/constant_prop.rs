@@ -1,5 +1,5 @@
 use super::RuntimeConstant;
-use ast::nodes::{Expr, Literal};
+use otterc_ast::nodes::{Expr, Literal};
 
 /// Propagates constant values through expressions
 pub struct ConstantPropagator;

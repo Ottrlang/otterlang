@@ -14,16 +14,16 @@ use crate::runtime::ffi;
 use crate::runtime::symbol_registry::SymbolRegistry;
 use crate::typecheck::{self, TypeChecker};
 use crate::version::VERSION;
-use ::ffi::{BridgeSymbolRegistry, FunctionSpec, TypeSpec};
-use cache::{CacheBuildOptions, CacheEntry, CacheManager, CacheMetadata, CompilationInputs};
-use language::LanguageFeatureFlags;
-use lexer::{LexerError, tokenize};
-use module::ModuleProcessor;
-use parser::{ParserError, parse};
+use otterc_cache::{CacheBuildOptions, CacheEntry, CacheManager, CacheMetadata, CompilationInputs};
+use otterc_ffi::{BridgeSymbolRegistry, FunctionSpec, TypeSpec};
+use otterc_language::LanguageFeatureFlags;
+use otterc_lexer::{LexerError, tokenize};
+use otterc_module::ModuleProcessor;
+use otterc_parser::{ParserError, parse};
+use otterc_utils::errors::{Diagnostic, emit_diagnostics};
+use otterc_utils::logger;
+use otterc_utils::profiler::{PhaseTiming, Profiler};
 use std::collections::{HashMap, HashSet};
-use utils::errors::{Diagnostic, emit_diagnostics};
-use utils::logger;
-use utils::profiler::{PhaseTiming, Profiler};
 
 #[derive(Parser, Debug)]
 #[command(name = "otter", version = VERSION, about = "OtterLang compiler")]
@@ -769,10 +769,10 @@ fn print_timings(stage: &CompilationStage) {
 }
 
 fn handle_fmt(paths: &[PathBuf]) -> Result<()> {
-    use fmt::Formatter;
     use glob::glob;
-    use lexer::tokenize;
-    use parser::parse;
+    use otterc_fmt::Formatter;
+    use otterc_lexer::tokenize;
+    use otterc_parser::parse;
 
     println!("Formatting OtterLang files...");
 
@@ -937,7 +937,7 @@ fn handle_test(
 }
 
 fn register_rust_ffi_functions_for_typecheck(
-    program: &ast::nodes::Program,
+    program: &otterc_ast::nodes::Program,
     registry: &'static SymbolRegistry,
 ) -> Result<()> {
     let imports = collect_rust_imports_for_typecheck(program);
@@ -961,9 +961,9 @@ fn register_rust_ffi_functions_for_typecheck(
 }
 
 fn collect_rust_imports_for_typecheck(
-    program: &ast::nodes::Program,
+    program: &otterc_ast::nodes::Program,
 ) -> HashMap<String, HashSet<String>> {
-    use ast::nodes::Statement;
+    use otterc_ast::nodes::Statement;
     let mut imports: HashMap<String, HashSet<String>> = HashMap::new();
 
     for statement in &program.statements {

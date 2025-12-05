@@ -1,5 +1,5 @@
 use super::RuntimeType;
-use ast::nodes::{Expr, Literal};
+use otterc_ast::nodes::{Expr, Literal};
 
 /// Tracks runtime types for specialization
 pub struct TypeTracker {

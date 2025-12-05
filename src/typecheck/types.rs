@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use ast::nodes::{EnumVariant, Node, Type};
-use common::Span;
+use otterc_span::Span;
+use otterc_ast::nodes::{EnumVariant, Node, Type};
 
-use language::LanguageFeatureFlags;
+use otterc_language::LanguageFeatureFlags;
 
 /// Represents a type in the type system
 #[derive(Debug, Clone, PartialEq, Eq)]

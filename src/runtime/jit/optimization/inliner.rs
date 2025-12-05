@@ -2,7 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use super::call_graph::CallGraph;
-use ast::nodes::{
+use otterc_ast::nodes::{
     Block, Expr, FStringPart, Function, Literal, MatchArm, Node, Pattern, Program, Statement,
 };
 

@@ -181,13 +181,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ast"
-version = "0.1.0"
-dependencies = [
- "common",
-]
-
-[[package]]
 name = "async-trait"
 version = "0.1.89"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -253,14 +246,6 @@ name = "bytes"
 version = "1.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
-
-[[package]]
-name = "cache"
-version = "0.1.0"
-dependencies = [
- "directories",
- "serde",
-]
 
 [[package]]
 name = "camino"
@@ -404,10 +389,6 @@ dependencies = [
  "lazy_static",
  "windows-sys 0.59.0",
 ]
-
-[[package]]
-name = "common"
-version = "0.1.0"
 
 [[package]]
 name = "compact_str"
@@ -747,23 +728,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
-name = "ffi"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "cache",
- "duct",
- "libloading 0.8.9",
- "once_cell",
- "parking_lot",
- "serde",
- "serde_json",
- "serde_yaml",
- "sha1",
- "tracing",
-]
-
-[[package]]
 name = "find-msvc-tools"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -777,13 +741,6 @@ checksum = "bfe33edd8e85a12a67454e37f8c75e730830d83e313556ab9ebf9ee7fbeb3bfb"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
-]
-
-[[package]]
-name = "fmt"
-version = "0.1.0"
-dependencies = [
- "ast",
 ]
 
 [[package]]
@@ -1214,23 +1171,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "language"
-version = "0.1.0"
-
-[[package]]
 name = "lazy_static"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
-
-[[package]]
-name = "lexer"
-version = "0.1.0"
-dependencies = [
- "common",
- "thiserror",
- "utils",
-]
 
 [[package]]
 name = "libc"
@@ -1394,17 +1338,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "module"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "ast",
- "lexer",
- "parser",
- "tempfile",
-]
-
-[[package]]
 name = "ntapi"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1475,6 +1408,93 @@ dependencies = [
 ]
 
 [[package]]
+name = "otterc_ast"
+version = "0.1.0"
+dependencies = [
+ "otterc_span",
+]
+
+[[package]]
+name = "otterc_cache"
+version = "0.1.0"
+dependencies = [
+ "directories",
+ "serde",
+]
+
+[[package]]
+name = "otterc_ffi"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "duct",
+ "libloading 0.8.9",
+ "once_cell",
+ "otterc_cache",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha1",
+ "tracing",
+]
+
+[[package]]
+name = "otterc_fmt"
+version = "0.1.0"
+dependencies = [
+ "otterc_ast",
+]
+
+[[package]]
+name = "otterc_language"
+version = "0.1.0"
+
+[[package]]
+name = "otterc_lexer"
+version = "0.1.0"
+dependencies = [
+ "otterc_span",
+ "otterc_utils",
+ "thiserror",
+]
+
+[[package]]
+name = "otterc_module"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "otterc_ast",
+ "otterc_lexer",
+ "otterc_parser",
+ "tempfile",
+]
+
+[[package]]
+name = "otterc_parser"
+version = "0.1.0"
+dependencies = [
+ "chumsky",
+ "otterc_ast",
+ "otterc_lexer",
+ "otterc_span",
+ "otterc_utils",
+]
+
+[[package]]
+name = "otterc_span"
+version = "0.1.0"
+
+[[package]]
+name = "otterc_utils"
+version = "0.1.0"
+dependencies = [
+ "ariadne",
+ "otterc_span",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "otterlang"
 version = "0.1.0"
 dependencies = [
@@ -1482,36 +1502,37 @@ dependencies = [
  "ahash",
  "anyhow",
  "ariadne",
- "ast",
- "cache",
  "cargo_metadata",
  "chrono",
  "chumsky",
  "clap",
  "colored",
- "common",
  "crossbeam-channel",
  "crossbeam-deque",
  "crossbeam-utils",
  "crossterm 0.29.0",
  "directories",
  "duct",
- "ffi",
- "fmt",
  "glob",
  "indicatif",
  "inkwell",
  "inventory",
- "language",
- "lexer",
  "libc",
  "libloading 0.8.9",
  "libm",
  "memmap2",
- "module",
  "once_cell",
+ "otterc_ast",
+ "otterc_cache",
+ "otterc_ffi",
+ "otterc_fmt",
+ "otterc_language",
+ "otterc_lexer",
+ "otterc_module",
+ "otterc_parser",
+ "otterc_span",
+ "otterc_utils",
  "parking_lot",
- "parser",
  "ratatui",
  "rayon",
  "serde",
@@ -1526,7 +1547,6 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "ureq",
- "utils",
 ]
 
 [[package]]
@@ -1550,17 +1570,6 @@ dependencies = [
  "redox_syscall",
  "smallvec",
  "windows-link",
-]
-
-[[package]]
-name = "parser"
-version = "0.1.0"
-dependencies = [
- "ast",
- "chumsky",
- "common",
- "lexer",
- "utils",
 ]
 
 [[package]]
@@ -2457,15 +2466,6 @@ name = "utf8parse"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
-
-[[package]]
-name = "utils"
-version = "0.1.0"
-dependencies = [
- "ariadne",
- "common",
- "tracing-subscriber",
-]
 
 [[package]]
 name = "valuable"

@@ -9,7 +9,7 @@ use tempfile::TempDir;
 use crate::codegen::{CodegenOptLevel, CodegenOptions, build_shared_library};
 use crate::runtime::symbol_registry::SymbolRegistry;
 use crate::typecheck::TypeChecker;
-use ast::nodes::{Program, Statement};
+use otterc_ast::nodes::{Program, Statement};
 
 use super::adaptive::{AdaptiveConcurrencyManager, AdaptiveMemoryManager};
 use super::cache::FunctionCache;

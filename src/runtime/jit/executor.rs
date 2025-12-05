@@ -1,7 +1,7 @@
 use crate::runtime::jit::engine::JitEngine;
 use crate::runtime::symbol_registry::SymbolRegistry;
 use anyhow::Result;
-use ast::nodes::Program;
+use otterc_ast::nodes::Program;
 use std::collections::HashMap;
 
 /// Simplified JIT executor for running programs

@@ -12,7 +12,7 @@ use tracing::debug;
 use super::{FfiBackend, bootstrap_stdlib, register_dynamic_exports};
 use crate::runtime::ffi_api;
 use crate::runtime::symbol_registry::SymbolRegistry;
-use cache::path::cache_root;
+use otterc_cache::path::cache_root;
 
 type JsonDispatcher = unsafe extern "C" fn(
     *const std::os::raw::c_char,

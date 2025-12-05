@@ -4,11 +4,11 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use anyhow::{Context, Result, anyhow, bail};
-use ast::nodes::Program;
-use common::Span;
+use otterc_span::Span;
 use inkwell::OptimizationLevel;
 use inkwell::context::Context as LlvmContext;
 use inkwell::targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target};
+use otterc_ast::nodes::Program;
 
 use crate::codegen::target::TargetTriple;
 use crate::typecheck::{EnumLayout, TypeInfo};

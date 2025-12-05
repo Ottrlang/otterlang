@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 use crate::codegen::llvm::compiler::Compiler;
 use crate::codegen::llvm::compiler::types::{EvaluatedValue, FunctionContext, OtterType, Variable};
 use crate::typecheck::TypeInfo;
-use ast::nodes::{BinaryOp, Block, Expr, FStringPart, Literal, Node, Statement, UnaryOp};
+use otterc_ast::nodes::{BinaryOp, Block, Expr, FStringPart, Literal, Node, Statement, UnaryOp};
 
 struct CapturedVariable<'ctx> {
     name: String,
@@ -713,14 +713,14 @@ impl<'ctx> Compiler<'ctx> {
 
     fn compile_pattern_match(
         &mut self,
-        pattern: &Node<ast::nodes::Pattern>,
+        pattern: &Node<otterc_ast::nodes::Pattern>,
         matched_val: &EvaluatedValue<'ctx>,
         matched_type: Option<TypeInfo>,
         success_bb: inkwell::basic_block::BasicBlock<'ctx>,
         fail_bb: inkwell::basic_block::BasicBlock<'ctx>,
         ctx: &mut FunctionContext<'ctx>,
     ) -> Result<()> {
-        use ast::nodes::Pattern;
+        use otterc_ast::nodes::Pattern;
 
         match pattern.as_ref() {
             Pattern::Wildcard => {
@@ -1136,10 +1136,10 @@ impl<'ctx> Compiler<'ctx> {
 
         for part in parts {
             let part_val = match part.as_ref() {
-                ast::nodes::FStringPart::Text(s) => {
+                otterc_ast::nodes::FStringPart::Text(s) => {
                     self.eval_literal(&Literal::String(s.clone()), None)?
                 }
-                ast::nodes::FStringPart::Expr(e) => self.eval_expr(e.as_ref(), ctx)?,
+                otterc_ast::nodes::FStringPart::Expr(e) => self.eval_expr(e.as_ref(), ctx)?,
             };
 
             result = self.build_string_concat(result, part_val)?;

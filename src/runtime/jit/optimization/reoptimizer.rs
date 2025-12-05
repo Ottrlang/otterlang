@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use super::call_graph::CallGraph;
 use super::inliner::{InlineConfig, Inliner};
 use crate::codegen::CodegenOptLevel;
-use ast::nodes::{
+use otterc_ast::nodes::{
     BinaryOp, Block, Expr, FStringPart, Function, Literal, Node, NumberLiteral, Program, Statement,
     UnaryOp,
 };

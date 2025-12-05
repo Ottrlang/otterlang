@@ -4,7 +4,7 @@ use inkwell::values::{BasicValueEnum, FunctionValue};
 use crate::codegen::llvm::compiler::Compiler;
 use crate::codegen::llvm::compiler::types::{EvaluatedValue, FunctionContext, OtterType, Variable};
 use crate::typecheck::TypeInfo;
-use ast::nodes::{Block, Expr, Statement};
+use otterc_ast::nodes::{Block, Expr, Statement};
 
 struct IteratorRuntime<'ctx> {
     create_fn: FunctionValue<'ctx>,
@@ -183,7 +183,10 @@ impl<'ctx> Compiler<'ctx> {
         ctx: &mut FunctionContext<'ctx>,
         cond: &Expr,
         then_block: &Block,
-        elif_blocks: &[(ast::nodes::Node<Expr>, ast::nodes::Node<Block>)],
+        elif_blocks: &[(
+            otterc_ast::nodes::Node<Expr>,
+            otterc_ast::nodes::Node<Block>,
+        )],
         else_block: Option<&Block>,
     ) -> Result<()> {
         let cond_val = self.eval_expr(cond, ctx)?;
@@ -285,7 +288,7 @@ impl<'ctx> Compiler<'ctx> {
         function: FunctionValue<'ctx>,
         ctx: &mut FunctionContext<'ctx>,
     ) -> Result<()> {
-        use ast::nodes::Expr;
+        use otterc_ast::nodes::Expr;
 
         // Iterator protocol implementation for range-based for loops
 

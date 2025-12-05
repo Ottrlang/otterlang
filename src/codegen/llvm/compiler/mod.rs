@@ -14,8 +14,8 @@ use inkwell::values::{FunctionValue, PointerValue};
 use crate::codegen::llvm::bridges::prepare_rust_bridges;
 use crate::runtime::symbol_registry::SymbolRegistry;
 use crate::typecheck::{EnumLayout, TypeInfo};
-use ast::nodes::{Block, Expr, FStringPart, Function, Node, Program, Statement};
-use common::Span;
+use otterc_ast::nodes::{Block, Expr, FStringPart, Function, Node, Program, Statement};
+use otterc_span::Span;
 
 pub mod expr;
 pub mod stmt;
@@ -311,7 +311,11 @@ impl<'ctx> Compiler<'ctx> {
         None
     }
 
-    fn rewrite_method_self_param(&self, method_func: &mut ast::nodes::Function, struct_name: &str) {
+    fn rewrite_method_self_param(
+        &self,
+        method_func: &mut otterc_ast::nodes::Function,
+        struct_name: &str,
+    ) {
         let Some(first_param) = method_func.params.first_mut() else {
             return;
         };
@@ -320,10 +324,10 @@ impl<'ctx> Compiler<'ctx> {
         // concrete struct name. This keeps the existing behavior but allows the
         // later logic to assume `self` always has a known type.
         if let Some(ty) = first_param.as_ref().ty.as_ref()
-            && matches!(ty.as_ref(), ast::nodes::Type::Simple(name) if name == "Self")
+            && matches!(ty.as_ref(), otterc_ast::nodes::Type::Simple(name) if name == "Self")
         {
             let span = *ty.span();
-            let replacement = ast::nodes::Type::Simple(struct_name.to_string());
+            let replacement = otterc_ast::nodes::Type::Simple(struct_name.to_string());
             first_param.as_mut().ty = Some(Node::new(replacement, span));
             return;
         }
@@ -335,7 +339,7 @@ impl<'ctx> Compiler<'ctx> {
         let has_type = first_param.as_ref().ty.is_some();
         if param_name_is_self && !has_type {
             let span = *first_param.as_ref().name.span();
-            let replacement = ast::nodes::Type::Simple(struct_name.to_string());
+            let replacement = otterc_ast::nodes::Type::Simple(struct_name.to_string());
             first_param.as_mut().ty = Some(Node::new(replacement, span));
         }
     }
@@ -502,9 +506,9 @@ impl<'ctx> Compiler<'ctx> {
     }
 
     /// Map AST type to LLVM type
-    fn map_ast_type(&self, ty: &ast::nodes::Type) -> Result<BasicTypeEnum<'ctx>> {
+    fn map_ast_type(&self, ty: &otterc_ast::nodes::Type) -> Result<BasicTypeEnum<'ctx>> {
         match ty {
-            ast::nodes::Type::Simple(name) => match name.as_str() {
+            otterc_ast::nodes::Type::Simple(name) => match name.as_str() {
                 "int" | "i64" => Ok(self.context.i64_type().into()),
                 "float" | "f64" => Ok(self.context.f64_type().into()),
                 "bool" => Ok(self.context.bool_type().into()),
@@ -520,13 +524,13 @@ impl<'ctx> Compiler<'ctx> {
                     }
                 }
             },
-            ast::nodes::Type::Generic { .. } => Ok(self.context.i64_type().into()), // Treat generics as opaque handles
+            otterc_ast::nodes::Type::Generic { .. } => Ok(self.context.i64_type().into()), // Treat generics as opaque handles
         }
     }
 
-    fn otter_type_from_annotation(&self, ty: &ast::nodes::Type) -> OtterType {
+    fn otter_type_from_annotation(&self, ty: &otterc_ast::nodes::Type) -> OtterType {
         match ty {
-            ast::nodes::Type::Simple(name) => match name.as_str() {
+            otterc_ast::nodes::Type::Simple(name) => match name.as_str() {
                 "int" | "i64" => OtterType::I64,
                 "float" | "f64" => OtterType::F64,
                 "bool" => OtterType::Bool,
@@ -539,7 +543,7 @@ impl<'ctx> Compiler<'ctx> {
                     .map(OtterType::Struct)
                     .unwrap_or(OtterType::Opaque),
             },
-            ast::nodes::Type::Generic { base, args, .. } => {
+            otterc_ast::nodes::Type::Generic { base, args, .. } => {
                 // Handle generic types like list<str>, map<str, int>, etc.
                 match base.as_str() {
                     "list" | "List" => {
@@ -595,11 +599,11 @@ impl<'ctx> Compiler<'ctx> {
         }
     }
 
-    fn register_function_prototype(&mut self, func: &ast::nodes::Function) -> Result<()> {
+    fn register_function_prototype(&mut self, func: &otterc_ast::nodes::Function) -> Result<()> {
         let ret_type: Option<BasicTypeEnum> = if let Some(ret_ty) = &func.ret_ty {
             let mapped_ty = self.map_ast_type(ret_ty.as_ref())?;
             // Check if it's effectively unit/void
-            if let ast::nodes::Type::Simple(name) = ret_ty.as_ref() {
+            if let otterc_ast::nodes::Type::Simple(name) = ret_ty.as_ref() {
                 if name == "void" || name == "unit" {
                     None
                 } else {
@@ -656,7 +660,7 @@ impl<'ctx> Compiler<'ctx> {
         Ok(())
     }
 
-    fn compile_function(&mut self, func: &ast::nodes::Function) -> Result<()> {
+    fn compile_function(&mut self, func: &otterc_ast::nodes::Function) -> Result<()> {
         let function = self
             .declared_functions
             .get(&func.name)

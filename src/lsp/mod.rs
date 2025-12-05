@@ -8,11 +8,13 @@ use tower_lsp::{Client, LanguageServer, LspService, Server};
 
 use crate::runtime::symbol_registry::SymbolRegistry;
 use crate::typecheck::{self, TypeChecker};
-use ast::nodes::{Expr, Function, Node, Program, Statement, Type};
-use common::Span;
-use lexer::{LexerError, Token, tokenize};
-use parser::parse;
-use utils::errors::{Diagnostic as OtterDiagnostic, DiagnosticSeverity as OtterDiagSeverity};
+use otterc_ast::nodes::{Expr, Function, Node, Program, Statement, Type};
+use otterc_lexer::{LexerError, Token, tokenize};
+use otterc_parser::parse;
+use otterc_span::Span;
+use otterc_utils::errors::{
+    Diagnostic as OtterDiagnostic, DiagnosticSeverity as OtterDiagSeverity,
+};
 
 const BUILTIN_FUNCTION_COMPLETIONS: &[(&str, &str)] = &[
     ("print", "fn print(message: string) -> unit"),
@@ -1207,7 +1209,7 @@ fn collect_references_from_expr(
 /// Find span of a name in tokens (approximate)
 fn find_name_span(name: &str, tokens: &[Token], _text: &str) -> Option<Span> {
     for token in tokens {
-        if let lexer::token::TokenKind::Identifier(ref id) = token.kind
+        if let otterc_lexer::token::TokenKind::Identifier(ref id) = token.kind
             && id == name
         {
             return Some(token.span);

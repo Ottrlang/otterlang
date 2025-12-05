@@ -1,0 +1,12 @@
+[package]
+name = "otterc_parser"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+otterc_span.path = "../otterc_span"
+otterc_lexer.path = "../otterc_lexer"
+otterc_utils.path = "../otterc_utils"
+otterc_ast.path = "../otterc_ast"
+
+chumsky = "0.9"

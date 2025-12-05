@@ -31,16 +31,16 @@ toml-config = []
 ffi-main = []
 
 [dependencies]
-ast.path = "crates/ast"
-common.path = "crates/common"
-utils.path = "crates/utils"
-lexer.path = "crates/lexer"
-cache.path = "crates/cache"
-ffi.path = "crates/ffi"
-fmt.path = "crates/fmt"
-parser.path = "crates/parser"
-language.path = "crates/language"
-module.path = "crates/module"
+otterc_ast.path = "crates/otterc_ast"
+otterc_span.path = "crates/otterc_span"
+otterc_utils.path = "crates/otterc_utils"
+otterc_lexer.path = "crates/otterc_lexer"
+otterc_cache.path = "crates/otterc_cache"
+otterc_ffi.path = "crates/otterc_ffi"
+otterc_fmt.path = "crates/otterc_fmt"
+otterc_parser.path = "crates/otterc_parser"
+otterc_language.path = "crates/otterc_language"
+otterc_module.path = "crates/otterc_module"
 
 anyhow = "1.0"
 tempfile = "3.10"
@@ -77,16 +77,19 @@ thiserror = "1.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 tower-lsp = "0.20"
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std", "time"] }
+tokio = { version = "1", features = [
+    "macros",
+    "rt-multi-thread",
+    "io-std",
+    "time",
+] }
 ratatui = "0.29.0"
 crossterm = "0.29.0"
 ureq = { version = "2", default-features = true }
 
 [workspace]
 resolver = "3"
-members = [
-    "crates/*"
-]
+members = ["crates/*"]
 
 [patch.crates-io]
 llvm-sys = { path = "vendor/llvm-sys" }

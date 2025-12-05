@@ -5,12 +5,12 @@ use crate::runtime::symbol_registry::{FfiType, SymbolRegistry};
 use crate::typecheck::types::{
     EnumDefinition, EnumLayout, StructDefinition, TypeContext, TypeError, TypeInfo,
 };
-use ast::nodes::{
+use otterc_span::Span;
+use otterc_ast::nodes::{
     BinaryOp, Block, Expr, FStringPart, Function, Literal, Node, Pattern, Program, Statement, Type,
     UnaryOp, UseImport,
 };
-use common::Span;
-use language::LanguageFeatureFlags;
+use otterc_language::LanguageFeatureFlags;
 
 /// Type checker that validates and infers types in OtterLang programs
 pub struct TypeChecker {
@@ -2923,8 +2923,8 @@ fn ffi_type_to_typeinfo(ft: &FfiType) -> TypeInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ast::nodes::{BinaryOp, Expr, Literal, Node, NumberLiteral};
-    use common::Span;
+    use otterc_span::Span;
+    use otterc_ast::nodes::{BinaryOp, Expr, Literal, Node, NumberLiteral};
     use std::f64;
 
     #[test]

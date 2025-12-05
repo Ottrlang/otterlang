@@ -1,5 +1,5 @@
-use common::Span;
-use utils::errors::{Diagnostic, DiagnosticSeverity};
+use otterc_span::Span;
+use otterc_utils::errors::{Diagnostic, DiagnosticSeverity};
 
 use super::TypeError;
 

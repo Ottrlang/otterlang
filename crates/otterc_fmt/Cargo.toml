@@ -1,0 +1,7 @@
+[package]
+name = "otterc_fmt"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+otterc_ast.path = "../otterc_ast"
