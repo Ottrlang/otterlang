@@ -15,6 +15,7 @@ pub struct Diagnostic {
     source_id: String,
     span: Span,
     message: String,
+    label: Option<String>,
     suggestion: Option<String>,
     help: Option<String>,
 }
@@ -31,9 +32,15 @@ impl Diagnostic {
             source_id: source_id.into(),
             span,
             message: message.into(),
+            label: None,
             suggestion: None,
             help: None,
         }
+    }
+
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
     }
 
     pub fn with_suggestion(mut self, suggestion: impl Into<String>) -> Self {
@@ -60,6 +67,10 @@ impl Diagnostic {
 
     pub fn source_id(&self) -> &str {
         &self.source_id
+    }
+
+    pub fn label(&self) -> Option<&str> {
+        self.label.as_deref()
     }
 
     pub fn suggestion(&self) -> Option<&str> {
@@ -114,15 +125,28 @@ pub fn emit_diagnostics(diagnostics: &[Diagnostic], source: &str) {
             diagnostic.source_id().to_string(),
             span.start,
         )
-        .with_message(diagnostic.message())
-        .with_label(
-            Label::new((diagnostic.source_id().to_string(), span.clone()))
-                .with_message(diagnostic.message())
-                .with_color(color),
-        );
+        .with_message(diagnostic.message());
+
+        // Only add a label if there is specific label text, or if we want to point to the span
+        // without repeating the main error message.
+        if let Some(label_text) = diagnostic.label() {
+            report = report.with_label(
+                Label::new((diagnostic.source_id().to_string(), span.clone()))
+                    .with_message(label_text)
+                    .with_color(color),
+            );
+        } else {
+            // Just highlight the span without text if no specific label is provided
+            // to avoid duplicating the main message
+            report = report.with_label(
+                Label::new((diagnostic.source_id().to_string(), span.clone())).with_color(color),
+            );
+        }
 
         // Add suggestion if available
         if let Some(suggestion) = diagnostic.suggestion() {
+            // TODO: We could use `ariadne::Config` to make this fancier, but for now
+            // just improving the text format.
             report = report.with_note(format!("Suggestion: {}", suggestion));
         }
 
@@ -130,8 +154,15 @@ pub fn emit_diagnostics(diagnostics: &[Diagnostic], source: &str) {
         if let Some(help) = diagnostic.help() {
             report = report.with_note(help);
         } else {
-            report = report
-                .with_note("For more information, re-run with --debug to inspect tokens and AST.");
+            // Only show generic help for errors/warnings
+            if matches!(
+                diagnostic.severity,
+                DiagnosticSeverity::Error | DiagnosticSeverity::Warning
+            ) {
+                report = report.with_note(
+                    "For more information, re-run with --debug to inspect tokens and AST.",
+                );
+            }
         }
 
         let _ = report

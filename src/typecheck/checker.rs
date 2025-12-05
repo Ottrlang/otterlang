@@ -5,12 +5,12 @@ use crate::runtime::symbol_registry::{FfiType, SymbolRegistry};
 use crate::typecheck::types::{
     EnumDefinition, EnumLayout, StructDefinition, TypeContext, TypeError, TypeInfo,
 };
-use otterc_span::Span;
 use otterc_ast::nodes::{
     BinaryOp, Block, Expr, FStringPart, Function, Literal, Node, Pattern, Program, Statement, Type,
     UnaryOp, UseImport,
 };
 use otterc_language::LanguageFeatureFlags;
+use otterc_span::Span;
 
 /// Type checker that validates and infers types in OtterLang programs
 pub struct TypeChecker {
@@ -1719,15 +1719,26 @@ impl TypeChecker {
                             return Ok(TypeInfo::Error);
                         }
 
-                        self.errors.push(
-                            TypeError::new(format!("undefined variable: {}", name))
-                                .with_hint(format!(
-                                    "did you mean to declare it with `let {}`?",
-                                    name
-                                ))
-                                .with_help("Variables must be declared before use".to_string())
-                                .with_span(*span),
-                        );
+                        let mut error = TypeError::new(format!("undefined variable: {}", name))
+                            .with_help("Variables must be declared before use".to_string())
+                            .with_span(*span);
+
+                        // Try to find a suggestion
+                        let candidates = self.context.variables.keys().cloned();
+                        if let Some(closest) =
+                            otterc_utils::suggest::find_best_match(name, candidates)
+                        {
+                            error = error
+                                .with_hint(format!("did you mean `{}`?", closest))
+                                .with_suggestion(closest);
+                        } else {
+                            error = error.with_hint(format!(
+                                "did you mean to declare it with `let {}`?",
+                                name
+                            ));
+                        }
+
+                        self.errors.push(error);
                         Ok(TypeInfo::Error)
                     }
                 }
@@ -2064,7 +2075,9 @@ impl TypeChecker {
                                     args.iter().zip(params_slice.iter()).enumerate()
                                 {
                                     let arg_type = self.infer_expr_type(arg)?;
-                                    if !arg_type.is_compatible_with(param_type) {
+                                    if !matches!(arg_type, TypeInfo::Error)
+                                        && !arg_type.is_compatible_with(param_type)
+                                    {
                                         self.errors.push(
                                             TypeError::new(format!(
                                                 "argument {} type mismatch: expected {}, got {}",
@@ -2923,8 +2936,8 @@ fn ffi_type_to_typeinfo(ft: &FfiType) -> TypeInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use otterc_span::Span;
     use otterc_ast::nodes::{BinaryOp, Expr, Literal, Node, NumberLiteral};
+    use otterc_span::Span;
     use std::f64;
 
     #[test]

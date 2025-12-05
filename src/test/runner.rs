@@ -90,6 +90,9 @@ impl TestRunner {
         let binary_path = match &stage.result {
             crate::cli::CompilationResult::CacheHit(entry) => entry.binary_path.clone(),
             crate::cli::CompilationResult::Compiled { artifact, .. } => artifact.binary.clone(),
+            crate::cli::CompilationResult::Checked => {
+                unreachable!("check_only should be false for tests")
+            }
         };
 
         Ok(binary_path)

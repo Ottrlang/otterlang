@@ -20,12 +20,21 @@ fn to_diagnostic(error: &TypeError, source_id: &str, source: &str) -> Diagnostic
         error.message.clone(),
     );
 
-    if let Some(hint) = &error.hint {
-        diagnostic = diagnostic.with_suggestion(hint.clone());
+    if let Some(suggestion) = &error.suggestion {
+        diagnostic = diagnostic.with_suggestion(suggestion.clone());
     }
 
-    if let Some(help) = &error.help {
-        diagnostic = diagnostic.with_help(help.clone());
+    match (&error.hint, &error.help) {
+        (Some(hint), Some(help)) => {
+            diagnostic = diagnostic.with_help(format!("{}\n{}", hint, help));
+        }
+        (Some(hint), None) => {
+            diagnostic = diagnostic.with_help(hint.clone());
+        }
+        (None, Some(help)) => {
+            diagnostic = diagnostic.with_help(help.clone());
+        }
+        (None, None) => {}
     }
 
     diagnostic

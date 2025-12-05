@@ -1,7 +1,21 @@
 use otterlang::cli;
 
 fn main() -> anyhow::Result<()> {
-    cli::run()
+    if let Err(e) = cli::run() {
+        let msg = e.to_string();
+        // If the error is a known compilation failure that has already emitted diagnostics,
+        // just exit with error code 1 without printing the error object (which creates noise).
+        if msg.contains("lexing failed")
+            || msg.contains("parsing failed")
+            || msg.contains("type checking failed")
+        {
+            std::process::exit(1);
+        }
+        // For other unexpected errors, print them.
+        eprintln!("Error: {:?}", e);
+        std::process::exit(1);
+    }
+    Ok(())
 }
 
 #[cfg(test)]

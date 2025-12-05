@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use otterc_span::Span;
 use otterc_ast::nodes::{EnumVariant, Node, Type};
+use otterc_span::Span;
 
 use otterc_language::LanguageFeatureFlags;
 
@@ -457,6 +457,7 @@ pub struct TypeError {
     pub message: String,
     pub hint: Option<String>,
     pub help: Option<String>,
+    pub suggestion: Option<String>,
     pub span: Option<Span>,
 }
 
@@ -466,6 +467,7 @@ impl TypeError {
             message,
             hint: None,
             help: None,
+            suggestion: None,
             span: None,
         }
     }
@@ -477,6 +479,11 @@ impl TypeError {
 
     pub fn with_help(mut self, help: String) -> Self {
         self.help = Some(help);
+        self
+    }
+
+    pub fn with_suggestion(mut self, suggestion: String) -> Self {
+        self.suggestion = Some(suggestion);
         self
     }
 

@@ -14,6 +14,7 @@ use crate::runtime::ffi;
 use crate::runtime::symbol_registry::SymbolRegistry;
 use crate::typecheck::{self, TypeChecker};
 use crate::version::VERSION;
+use colored::Colorize;
 use otterc_cache::{CacheBuildOptions, CacheEntry, CacheManager, CacheMetadata, CompilationInputs};
 use otterc_ffi::{BridgeSymbolRegistry, FunctionSpec, TypeSpec};
 use otterc_language::LanguageFeatureFlags;
@@ -93,13 +94,18 @@ impl OtterCli {
 #[derive(Subcommand, Debug)]
 pub enum Command {
     /// Lexes, parses, and executes the specified source file via the cached native pipeline.
+    #[command(alias = "r")]
     Run { path: PathBuf },
     /// Builds a native executable from the specified source file.
+    #[command(alias = "b")]
     Build {
         path: PathBuf,
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
+    /// Checks the source file for errors without generating code.
+    #[command(alias = "c")]
+    Check { path: PathBuf },
     /// Start an interactive REPL (Read-Eval-Print Loop).
     Repl,
     /// Format OtterLang source code.
@@ -114,6 +120,7 @@ pub enum Command {
         subcommand: crate::tools::profiler::ProfileCommand,
     },
     /// Run tests in OtterLang source files
+    #[command(alias = "t")]
     Test {
         /// Test files or directories to run (defaults to current directory)
         #[arg(default_value = ".")]
@@ -139,6 +146,7 @@ pub fn run() -> Result<()> {
     match &cli.command {
         Command::Run { path } => handle_run(&cli, path),
         Command::Build { path, output } => handle_build(&cli, path, output.clone()),
+        Command::Check { path } => handle_check(&cli, path),
         Command::Repl => handle_repl(),
         Command::Fmt { paths } => handle_fmt(paths),
         Command::Profile { subcommand } => {
@@ -229,25 +237,30 @@ fn handle_run(cli: &OtterCli, path: &Path) -> Result<()> {
 
     match &stage.result {
         CompilationResult::CacheHit(entry) => {
-            println!("cache hit ({} bytes)", entry.metadata.binary_size);
+            println!(
+                "{} ({} bytes)",
+                "Cache hit".cyan().bold(),
+                entry.metadata.binary_size
+            );
             if settings.profile {
                 print_profile(&entry.metadata);
             }
             execute_binary(&entry.binary_path, &settings)?;
         }
         CompilationResult::Compiled { artifact, metadata } => {
-            println!("building {}", artifact.binary.display());
+            println!("{} {}", "Building".blue().bold(), artifact.binary.display());
             execute_binary(&artifact.binary, &settings)?;
             if settings.dump_ir
                 && let Some(ir) = &artifact.ir
             {
-                println!("\n== LLVM IR ==");
+                println!("\n{}", "== LLVM IR ==".bold());
                 println!("{ir}");
             }
             if settings.profile {
                 print_profile(metadata);
             }
         }
+        CompilationResult::Checked => unreachable!("check_only should be false for run command"),
     }
 
     if settings.time {
@@ -271,6 +284,7 @@ fn handle_build(cli: &OtterCli, path: &Path, output: Option<PathBuf>) -> Result<
     let cached_binary = match &stage.result {
         CompilationResult::CacheHit(entry) => &entry.binary_path,
         CompilationResult::Compiled { artifact, .. } => &artifact.binary,
+        CompilationResult::Checked => unreachable!("check_only should be false for build command"),
     };
 
     fs::copy(cached_binary, &output_path).with_context(|| {
@@ -281,14 +295,14 @@ fn handle_build(cli: &OtterCli, path: &Path, output: Option<PathBuf>) -> Result<
         )
     })?;
 
-    println!("built {}", output_path.display());
+    println!("{} {}", "Built".green().bold(), output_path.display());
 
     match &stage.result {
         CompilationResult::Compiled { artifact, metadata } => {
             if settings.dump_ir
                 && let Some(ir) = &artifact.ir
             {
-                println!("\n== LLVM IR ==");
+                println!("\n{}", "== LLVM IR ==".bold());
                 println!("{ir}");
             }
             if settings.profile {
@@ -300,12 +314,27 @@ fn handle_build(cli: &OtterCli, path: &Path, output: Option<PathBuf>) -> Result<
                 print_profile(&entry.metadata);
             }
         }
+        CompilationResult::Checked => unreachable!("check_only should be false for build command"),
     }
 
     if settings.time {
         print_timings(&stage);
     }
 
+    Ok(())
+}
+
+fn handle_check(cli: &OtterCli, path: &Path) -> Result<()> {
+    let mut settings = CompilationSettings::from_cli(cli);
+    settings.check_only = true;
+    let source = read_source(path)?;
+    let stage = compile_pipeline(path, &source, &settings)?;
+
+    if settings.time {
+        print_timings(&stage);
+    }
+
+    println!("{} {}", "Checked".green().bold(), path.display());
     Ok(())
 }
 
@@ -352,7 +381,7 @@ pub fn compile_pipeline(
     };
 
     if settings.dump_tokens {
-        println!("\n== Tokens ==");
+        println!("\n{}", "== Tokens ==".bold());
         for token in &tokens {
             println!("  {:?} @ {:?}", token.kind, token.span);
         }
@@ -372,7 +401,7 @@ pub fn compile_pipeline(
     };
 
     if settings.dump_ast {
-        println!("\n== AST ==");
+        println!("\n{}", "== AST ==".bold());
         println!("{:#?}", program);
     }
 
@@ -409,6 +438,14 @@ pub fn compile_pipeline(
             typecheck::diagnostics_from_type_errors(type_checker.errors(), &source_id, source);
         emit_diagnostics(&diagnostics, source);
         return Err(err).with_context(|| "type checking failed");
+    }
+
+    if settings.check_only {
+        profiler.push_phase("Codegen skipped", Duration::from_millis(0));
+        return Ok(CompilationStage {
+            profiler,
+            result: CompilationResult::Checked,
+        });
     }
 
     let enum_layouts = type_checker.enum_layouts();
@@ -506,6 +543,7 @@ pub struct CompilationStage {
 
 pub enum CompilationResult {
     CacheHit(CacheEntry),
+    Checked,
     Compiled {
         artifact: BuildArtifact,
         metadata: CacheMetadata,
@@ -535,6 +573,7 @@ pub struct CompilationSettings {
     enable_cache: bool,
     cache_dir: PathBuf,
     max_cache_size: usize,
+    check_only: bool,
     language_features: LanguageFeatureFlags,
 }
 
@@ -557,12 +596,13 @@ impl CompilationSettings {
             enable_cache: !cli.no_cache,
             cache_dir: PathBuf::from("./cache"),
             max_cache_size: 1024 * 1024 * 1024, // 1GB default
+            check_only: false,
             language_features,
         }
     }
 
     fn allow_cache(&self) -> bool {
-        !(self.dump_tokens || self.dump_ast || self.dump_ir || self.no_cache)
+        !(self.dump_tokens || self.dump_ast || self.dump_ir || self.no_cache || self.check_only)
     }
 
     fn cache_build_options(&self) -> CacheBuildOptions {

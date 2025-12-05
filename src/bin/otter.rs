@@ -1,7 +1,18 @@
 use otterlang::cli;
 
 fn main() -> anyhow::Result<()> {
-    cli::run()
+    if let Err(e) = cli::run() {
+        let msg = e.to_string();
+        if msg.contains("lexing failed")
+            || msg.contains("parsing failed")
+            || msg.contains("type checking failed")
+        {
+            std::process::exit(1);
+        }
+        eprintln!("Error: {:?}", e);
+        std::process::exit(1);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
