@@ -3,7 +3,7 @@ use inkwell::values::{BasicValueEnum, FunctionValue};
 
 use crate::codegen::llvm::compiler::Compiler;
 use crate::codegen::llvm::compiler::types::{EvaluatedValue, FunctionContext, OtterType, Variable};
-use crate::typecheck::TypeInfo;
+use otterc_typecheck::TypeInfo;
 use otterc_ast::nodes::{Block, Expr, Statement};
 
 struct IteratorRuntime<'ctx> {

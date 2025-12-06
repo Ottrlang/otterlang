@@ -1,10 +1,19 @@
-use anyhow::{Result, bail};
-use std::collections::HashMap;
+#![allow(
+    clippy::arbitrary_source_item_ordering,
+    reason = "Helper methods stay grouped by behavior to match the legacy layout."
+)]
+#![allow(
+    clippy::single_call_fn,
+    reason = "Some helpers remain for future reuse even if only invoked once today."
+)]
 
-use crate::runtime::symbol_registry::{FfiType, SymbolRegistry};
-use crate::typecheck::types::{
+use anyhow::{bail, Result};
+use std::collections::{HashMap, HashSet};
+
+use crate::types::{
     EnumDefinition, EnumLayout, StructDefinition, TypeContext, TypeError, TypeInfo,
 };
+use otterc_symbols::{FfiType, SymbolRegistry};
 use otterc_ast::nodes::{
     BinaryOp, Block, Expr, FStringPart, Function, Literal, Node, Pattern, Program, Statement, Type,
     UnaryOp, UseImport,
@@ -12,24 +21,38 @@ use otterc_ast::nodes::{
 use otterc_language::LanguageFeatureFlags;
 use otterc_span::Span;
 
-/// Type checker that validates and infers types in OtterLang programs
+/// Type checker that validates and infers types in `OtterLang` programs
+#[expect(
+    clippy::module_name_repetitions,
+    reason = "The canonical name for this component is TypeChecker."
+)]
 pub struct TypeChecker {
-    errors: Vec<TypeError>,
-    context: TypeContext,
-    registry: Option<&'static SymbolRegistry>,
-    expr_types: HashMap<usize, TypeInfo>,
-    expr_types_by_span: HashMap<Span, TypeInfo>,
-    expr_spans: HashMap<usize, Span>,
+    /// Captured types for comprehension-generated bindings.
     comprehension_var_types: HashMap<Span, TypeInfo>,
-    method_comprehension_spans: HashMap<String, Vec<Span>>,
-    method_expr_ids: HashMap<String, Vec<usize>>,
-    features: LanguageFeatureFlags,
-    /// Current function's return type (if inside a function)
+    /// Global typing context tracking variables, functions, and types.
+    context: TypeContext,
+    /// Return type expected for the current function scope.
     current_function_return_type: Option<TypeInfo>,
+    /// Accumulated type errors.
+    errors: Vec<TypeError>,
+    /// Mapping from expression id to source span.
+    expr_spans: HashMap<usize, Span>,
+    /// Cached type information per expression id.
+    expr_types: HashMap<usize, TypeInfo>,
+    /// Cached type information per source span.
+    expr_types_by_span: HashMap<Span, TypeInfo>,
+    /// Enabled language features.
+    features: LanguageFeatureFlags,
+    /// Recorded comprehension metadata keyed by helper method name.
+    method_comprehension_spans: HashMap<String, Vec<Span>>,
+    /// Recorded expression ids used by helper methods.
+    method_expr_ids: HashMap<String, Vec<usize>>,
+    /// Registry of runtime symbols when available.
+    registry: Option<&'static SymbolRegistry>,
 }
 
 impl TypeChecker {
-    fn collect_generic_usages(&self, ty: &TypeInfo, used: &mut std::collections::HashSet<String>) {
+    fn collect_generic_usages(ty: &TypeInfo, used: &mut HashSet<String>) {
         match ty {
             TypeInfo::Generic { base, args } => {
                 if args.is_empty() {
@@ -38,14 +61,14 @@ impl TypeChecker {
                 } else {
                     // If it has args, the base is likely a type (List, Dict, Struct), so we check args
                     for arg in args {
-                        self.collect_generic_usages(arg, used);
+                        Self::collect_generic_usages(arg, used);
                     }
                 }
             }
-            TypeInfo::List(inner) => self.collect_generic_usages(inner, used),
+            TypeInfo::List(inner) => Self::collect_generic_usages(inner, used),
             TypeInfo::Dict { key, value } => {
-                self.collect_generic_usages(key, used);
-                self.collect_generic_usages(value, used);
+                Self::collect_generic_usages(key, used);
+                Self::collect_generic_usages(value, used);
             }
             TypeInfo::Function {
                 params,
@@ -53,9 +76,9 @@ impl TypeChecker {
                 ..
             } => {
                 for param in params {
-                    self.collect_generic_usages(param, used);
+                    Self::collect_generic_usages(param, used);
                 }
-                self.collect_generic_usages(return_type, used);
+                Self::collect_generic_usages(return_type, used);
             }
             TypeInfo::Struct { .. } | TypeInfo::Enum { .. } => {
                 // Structs and Enums in TypeInfo are usually fully resolved or have their generics in args (if we added args to them)
@@ -68,23 +91,6 @@ impl TypeChecker {
     fn is_unknown_like(ty: &TypeInfo) -> bool {
         matches!(ty, TypeInfo::Unknown)
             || matches!(ty, TypeInfo::Generic { args, .. } if args.is_empty())
-    }
-
-    fn merge_unknown_like_types(left: &TypeInfo, right: &TypeInfo) -> TypeInfo {
-        match (Self::is_unknown_like(left), Self::is_unknown_like(right)) {
-            (false, false) => left.clone(),
-            (false, true) => left.clone(),
-            (true, false) => right.clone(),
-            (true, true) => match (left, right) {
-                (
-                    TypeInfo::Generic { base: b1, args: a1 },
-                    TypeInfo::Generic { base: b2, args: a2 },
-                ) if a1.is_empty() && a2.is_empty() && b1 == b2 => left.clone(),
-                (TypeInfo::Generic { args, .. }, _) if args.is_empty() => left.clone(),
-                (_, TypeInfo::Generic { args, .. }) if args.is_empty() => right.clone(),
-                _ => TypeInfo::Unknown,
-            },
-        }
     }
 
     fn record_expr_type(&mut self, expr: &Node<Expr>, ty: &TypeInfo) {
@@ -634,7 +640,29 @@ impl TypeChecker {
             return;
         };
 
-        let Some(module_name) = Self::canonical_module_name(&import.as_ref().module) else {
+        let module_spec = &import.as_ref().module;
+        let Some(module_name) = ({
+            if module_spec.starts_with("rust:") {
+                None
+            } else {
+                let candidate = module_spec.rsplit(':').next().unwrap_or(module_spec);
+                if candidate.starts_with('.')
+                    || candidate.starts_with('/')
+                    || candidate.contains('/')
+                    || candidate.contains('\\')
+                {
+                    None
+                } else {
+                    let trimmed = candidate.trim();
+                    if trimmed.is_empty() {
+                        None
+                    } else {
+                        let canonical = trimmed.rsplit('.').next().unwrap_or(trimmed);
+                        (!canonical.is_empty()).then(|| canonical.to_string())
+                    }
+                }
+            }
+        }) else {
             return;
         };
 
@@ -650,33 +678,6 @@ impl TypeChecker {
             .unwrap_or_else(|| module_name.clone());
         self.context
             .insert_variable(alias, TypeInfo::Module(module_name));
-    }
-
-    fn canonical_module_name(module: &str) -> Option<String> {
-        if module.starts_with("rust:") {
-            return None;
-        }
-
-        let candidate = module.rsplit(':').next().unwrap_or(module);
-        if candidate.starts_with('.') || candidate.starts_with('/') {
-            return None;
-        }
-
-        if candidate.contains('/') || candidate.contains('\\') {
-            return None;
-        }
-
-        let trimmed = candidate.trim();
-        if trimmed.is_empty() {
-            return None;
-        }
-
-        let canonical = trimmed.rsplit('.').next().unwrap_or(trimmed);
-        if canonical.is_empty() {
-            None
-        } else {
-            Some(canonical.to_string())
-        }
     }
 
     fn register_type_definitions(&mut self, statements: &[Node<Statement>]) {
@@ -696,9 +697,9 @@ impl TypeChecker {
                     }
 
                     // Validate generic parameters
-                    let mut used_generics = std::collections::HashSet::new();
+                    let mut used_generics = HashSet::new();
                     for ty in field_types.values() {
-                        self.collect_generic_usages(ty, &mut used_generics);
+                        Self::collect_generic_usages(ty, &mut used_generics);
                     }
 
                     for generic in generics {
@@ -817,70 +818,6 @@ impl TypeChecker {
         self.current_function_return_type = old_return_type;
 
         Ok(())
-    }
-
-    /// Check function with generic type parameters
-    /// This handles functions that have generic type parameters in their signature
-    #[allow(dead_code)]
-    fn check_function_with_generics(&mut self, function: &Node<Function>) -> Result<()> {
-        // Extract generic type parameters from function signature
-        let mut generic_params = Vec::new();
-
-        // Check parameter types for generic parameters
-        for param in &function.as_ref().params {
-            if let Some(ty) = &param.as_ref().ty {
-                self.extract_generic_params(ty, &mut generic_params);
-            }
-        }
-
-        if let Some(ret_ty) = &function.as_ref().ret_ty {
-            self.extract_generic_params(ret_ty, &mut generic_params);
-        }
-
-        // Push generic parameters to context
-        for param in &generic_params {
-            self.context.push_generic(param.clone());
-        }
-
-        // Type check function body
-        let result = self.check_function(function);
-
-        // Pop generic parameters
-        for _ in &generic_params {
-            self.context.pop_generic();
-        }
-
-        result
-    }
-
-    /// Extract generic type parameter names from a type
-    #[allow(dead_code)]
-    fn extract_generic_params(&self, ty: &Node<Type>, params: &mut Vec<String>) {
-        match ty.as_ref() {
-            Type::Simple(name) => {
-                // Check if this looks like a generic parameter (single uppercase letter or common generic names)
-                // In OtterLang, generic parameters are typically single uppercase letters (T, U, etc.)
-                if name.len() == 1
-                    && name.chars().next().unwrap().is_uppercase()
-                    && !params.contains(name)
-                {
-                    params.push(name.clone());
-                }
-            }
-            Type::Generic { base, args } => {
-                // Check if base is a generic parameter
-                if base.len() == 1
-                    && base.chars().next().unwrap().is_uppercase()
-                    && !params.contains(base)
-                {
-                    params.push(base.clone());
-                }
-                // Recursively extract from type arguments
-                for arg in args {
-                    self.extract_generic_params(arg, params);
-                }
-            }
-        }
     }
 
     fn try_eval_enum_constructor(
@@ -1113,6 +1050,8 @@ impl TypeChecker {
                         }
                         _ => {}
                     }
+                } else {
+                    // Nothing to infer when the expected type is not generic and has no args.
                 }
             }
             TypeInfo::List(inner) => {
@@ -1293,11 +1232,7 @@ impl TypeChecker {
             } => {
                 // Check that the value type is an enum and matches the pattern
                 match ty {
-                    TypeInfo::Enum {
-                        name,
-                        args: _,
-                        variants,
-                    } => {
+                    TypeInfo::Enum { name, variants, .. } => {
                         if name != enum_name {
                             self.errors.push(
                                 TypeError::new(format!(
@@ -1324,15 +1259,17 @@ impl TypeChecker {
                                     self.validate_pattern_against_type(field_pattern, field_type);
                                 }
                             }
-                        } else {
-                            self.errors.push(
-                                TypeError::new(format!(
-                                    "enum '{}' has no variant '{}'",
-                                    enum_name, variant
-                                ))
-                                .with_span(*pattern.span()),
-                            );
+                            return;
                         }
+
+                        self.errors.push(
+                            TypeError::new(format!(
+                                "enum '{}' has no variant '{}'",
+                                enum_name, variant
+                            ))
+                            .with_span(*pattern.span()),
+                        );
+                        return;
                     }
                     TypeInfo::Generic { base, args } if base == enum_name => {
                         // Try to build the enum type from generic
@@ -1772,7 +1709,32 @@ impl TypeChecker {
                                     if Self::is_unknown_like(&left_type)
                                         || Self::is_unknown_like(&right_type)
                                     {
-                                        Ok(Self::merge_unknown_like_types(&left_type, &right_type))
+                                        let merged = if !Self::is_unknown_like(&left_type) {
+                                            left_type.clone()
+                                        } else if !Self::is_unknown_like(&right_type) {
+                                            right_type.clone()
+                                        } else {
+                                            match (&left_type, &right_type) {
+                                                (
+                                                    TypeInfo::Generic { base: b1, args: a1 },
+                                                    TypeInfo::Generic { base: b2, args: a2 },
+                                                ) if a1.is_empty() && a2.is_empty() && b1 == b2 => {
+                                                    left_type.clone()
+                                                }
+                                                (TypeInfo::Generic { args, .. }, _)
+                                                    if args.is_empty() =>
+                                                {
+                                                    left_type.clone()
+                                                }
+                                                (_, TypeInfo::Generic { args, .. })
+                                                    if args.is_empty() =>
+                                                {
+                                                    right_type.clone()
+                                                }
+                                                _ => TypeInfo::Unknown,
+                                            }
+                                        };
+                                        Ok(merged)
                                     } else {
                                         self.errors.push(
                                             TypeError::new(format!(
@@ -2216,16 +2178,16 @@ impl TypeChecker {
                                 param_defaults: vec![],
                                 return_type: Box::new(TypeInfo::Unknown),
                             });
-                        } else {
-                            self.errors.push(
-                                TypeError::new(format!(
-                                    "enum '{}' has no variant '{}'",
-                                    enum_name, field
-                                ))
-                                .with_span(*span),
-                            );
-                            return Ok(TypeInfo::Error);
                         }
+
+                        self.errors.push(
+                            TypeError::new(format!(
+                                "enum '{}' has no variant '{}'",
+                                enum_name, field
+                            ))
+                            .with_span(*span),
+                        );
+                        return Ok(TypeInfo::Error);
                     }
 
                     let full_name = self.build_member_path(object, field);
@@ -2785,7 +2747,7 @@ impl TypeChecker {
                     // Check if inner_type is actually awaitable
                     match &inner_type {
                         // Task handles from spawn operations (generic types)
-                        TypeInfo::Generic { base, args: _ }
+                        TypeInfo::Generic { base, .. }
                             if base == "Task" || base == "Future" =>
                         {
                             // Explicitly async types are awaitable

@@ -22,11 +22,13 @@ fn levenshtein_distance(s1: &str, s2: &str) -> usize {
     let s2_len = s2.chars().count();
     let mut matrix = vec![vec![0; s2_len + 1]; s1_len + 1];
 
-    for i in 0..=s1_len {
-        matrix[i][0] = i;
+    for (i, row) in matrix.iter_mut().enumerate() {
+        row[0] = i;
     }
-    for j in 0..=s2_len {
-        matrix[0][j] = j;
+    if let Some(first_row) = matrix.first_mut() {
+        for (j, cell) in first_row.iter_mut().enumerate() {
+            *cell = j;
+        }
     }
 
     for (i, char1) in s1.chars().enumerate() {

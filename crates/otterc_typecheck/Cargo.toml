@@ -1,0 +1,17 @@
+[package]
+name = "otterc_typecheck"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0"
+ariadne = "0.3"
+ahash = "0.8"
+otterc_ast = { path = "../otterc_ast" }
+otterc_language = { path = "../otterc_language" }
+otterc_span = { path = "../otterc_span" }
+otterc_symbols = { path = "../otterc_symbols" }
+otterc_utils = { path = "../otterc_utils" }
+
+[lints]
+workspace = true

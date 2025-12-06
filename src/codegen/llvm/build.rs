@@ -11,7 +11,7 @@ use otterc_ast::nodes::Program;
 use otterc_span::Span;
 
 use crate::codegen::target::TargetTriple;
-use crate::typecheck::{EnumLayout, TypeInfo};
+use otterc_typecheck::{EnumLayout, TypeInfo};
 
 use super::bridges::prepare_rust_bridges;
 use super::compiler::Compiler;

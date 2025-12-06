@@ -71,7 +71,7 @@ pub struct EnumVariantInfo {
 impl TypeInfo {
     /// Check if this type is a generic type parameter
     pub fn is_generic_param(&self) -> bool {
-        matches!(self, TypeInfo::Generic { base: _, args } if args.is_empty())
+        matches!(self, TypeInfo::Generic { args, .. } if args.is_empty())
     }
 
     /// Substitute generic type parameters with concrete types
@@ -165,7 +165,7 @@ impl TypeInfo {
             | (TypeInfo::Str, TypeInfo::Str) => true,
 
             // Numeric promotions
-            (TypeInfo::I32, TypeInfo::I64) | (TypeInfo::I32, TypeInfo::F64) => true,
+            (TypeInfo::I32, TypeInfo::I64 | TypeInfo::F64) => true,
             (TypeInfo::I64, TypeInfo::F64) => true,
 
             // Unknown types are compatible with anything (during inference)
@@ -306,11 +306,7 @@ impl TypeInfo {
             TypeInfo::I64 => "i64".to_string(),
             TypeInfo::F64 => "f64".to_string(),
             TypeInfo::Str => "str".to_string(),
-            TypeInfo::Function {
-                params,
-                param_defaults: _,
-                return_type,
-            } => {
+            TypeInfo::Function { params, return_type, .. } => {
                 let params_str = params
                     .iter()
                     .map(|t| t.display_name())

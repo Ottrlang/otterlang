@@ -3,7 +3,7 @@ use anyhow::{Context, Result, bail};
 use crate::runtime::ffi;
 use crate::runtime::jit::executor::JitExecutor;
 use crate::runtime::symbol_registry::SymbolRegistry;
-use crate::typecheck::TypeChecker;
+use otterc_typecheck::TypeChecker;
 use otterc_ast::nodes::{Block, Expr, Function, Node, Program, Statement};
 use otterc_lexer::tokenize;
 use otterc_parser::parse;

@@ -1,3 +1,8 @@
+#![allow(
+    clippy::single_call_fn,
+    reason = "Helper routines are intentionally small even if only used once."
+)]
+
 use otterc_span::Span;
 use otterc_utils::errors::{Diagnostic, DiagnosticSeverity};
 
@@ -97,7 +102,7 @@ fn find_identifier_span(source: &str, needle: &str) -> Option<Span> {
     let bytes = source.as_bytes();
     let needle_bytes = needle.as_bytes();
     let len = needle_bytes.len();
-    let mut byte_index = 0usize;
+    let mut byte_index = 0_usize;
 
     while byte_index + len <= bytes.len() {
         if &bytes[byte_index..byte_index + len] == needle_bytes

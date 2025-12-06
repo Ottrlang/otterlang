@@ -12,7 +12,7 @@ use crate::codegen::{
 };
 use crate::runtime::ffi;
 use crate::runtime::symbol_registry::SymbolRegistry;
-use crate::typecheck::{self, TypeChecker};
+use otterc_typecheck::{diagnostics_from_type_errors, TypeChecker};
 use crate::version::VERSION;
 use colored::Colorize;
 use otterc_cache::{CacheBuildOptions, CacheEntry, CacheManager, CacheMetadata, CompilationInputs};
@@ -435,7 +435,7 @@ pub fn compile_pipeline(
 
     if let Err(err) = type_check_result {
         let diagnostics =
-            typecheck::diagnostics_from_type_errors(type_checker.errors(), &source_id, source);
+            diagnostics_from_type_errors(type_checker.errors(), &source_id, source);
         emit_diagnostics(&diagnostics, source);
         return Err(err).with_context(|| "type checking failed");
     }

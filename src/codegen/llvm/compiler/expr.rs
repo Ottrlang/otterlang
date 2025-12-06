@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 
 use crate::codegen::llvm::compiler::Compiler;
 use crate::codegen::llvm::compiler::types::{EvaluatedValue, FunctionContext, OtterType, Variable};
-use crate::typecheck::TypeInfo;
+use otterc_typecheck::TypeInfo;
 use otterc_ast::nodes::{BinaryOp, Block, Expr, FStringPart, Literal, Node, Statement, UnaryOp};
 
 struct CapturedVariable<'ctx> {

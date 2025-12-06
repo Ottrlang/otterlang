@@ -14,7 +14,7 @@ use inkwell::values::{FunctionValue, PointerValue};
 use crate::codegen::llvm::bridges::prepare_rust_bridges;
 use crate::codegen::target::TargetTriple;
 use crate::runtime::symbol_registry::SymbolRegistry;
-use crate::typecheck::{EnumLayout, TypeInfo};
+use otterc_typecheck::{EnumLayout, TypeInfo};
 use otterc_ast::nodes::{Block, Expr, FStringPart, Function, Node, Program, Statement};
 use otterc_span::Span;
 

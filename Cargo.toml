@@ -41,6 +41,8 @@ otterc_fmt.path = "crates/otterc_fmt"
 otterc_parser.path = "crates/otterc_parser"
 otterc_language.path = "crates/otterc_language"
 otterc_module.path = "crates/otterc_module"
+otterc_symbols.path = "crates/otterc_symbols"
+otterc_typecheck.path = "crates/otterc_typecheck"
 
 anyhow = "1.0"
 tempfile = "3.10"

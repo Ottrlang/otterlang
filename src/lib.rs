@@ -5,5 +5,4 @@ pub mod repl;
 pub mod runtime;
 pub mod test;
 pub mod tools;
-pub mod typecheck;
 pub mod version;

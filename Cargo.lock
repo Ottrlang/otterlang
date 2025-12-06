@@ -1482,8 +1482,66 @@ dependencies = [
 ]
 
 [[package]]
+name = "otterc_runtime"
+version = "0.1.0"
+dependencies = [
+ "abi_stable",
+ "ahash",
+ "anyhow",
+ "cargo_metadata",
+ "chrono",
+ "crossbeam-channel",
+ "crossbeam-deque",
+ "crossbeam-utils",
+ "duct",
+ "inventory",
+ "libloading 0.8.9",
+ "libm",
+ "once_cell",
+ "otterc_ast",
+ "otterc_cache",
+ "otterc_symbols",
+ "parking_lot",
+ "rayon",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha1",
+ "sysinfo",
+ "thiserror",
+ "tokio",
+ "toml",
+ "tracing",
+ "ureq",
+]
+
+[[package]]
 name = "otterc_span"
 version = "0.1.0"
+
+[[package]]
+name = "otterc_symbols"
+version = "0.1.0"
+dependencies = [
+ "abi_stable",
+ "ahash",
+ "once_cell",
+ "parking_lot",
+]
+
+[[package]]
+name = "otterc_typecheck"
+version = "0.1.0"
+dependencies = [
+ "ahash",
+ "anyhow",
+ "ariadne",
+ "otterc_ast",
+ "otterc_language",
+ "otterc_span",
+ "otterc_symbols",
+ "otterc_utils",
+]
 
 [[package]]
 name = "otterc_utils"
@@ -1531,6 +1589,8 @@ dependencies = [
  "otterc_module",
  "otterc_parser",
  "otterc_span",
+ "otterc_symbols",
+ "otterc_typecheck",
  "otterc_utils",
  "parking_lot",
  "ratatui",

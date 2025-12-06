@@ -9,14 +9,14 @@ use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use sysinfo::System;
 
-use crate::runtime::memory::config::GcStrategy;
-use crate::runtime::memory::gc::get_gc;
-use crate::runtime::memory::profiler::get_profiler;
-use crate::runtime::symbol_registry::{FfiFunction, FfiSignature, FfiType, SymbolRegistry};
+use crate::memory::config::GcStrategy;
+use crate::memory::gc::get_gc;
+use crate::memory::profiler::get_profiler;
+use crate::symbol_registry::{FfiFunction, FfiSignature, FfiType, SymbolRegistry};
 use crate::version::VERSION;
 
 #[cfg(feature = "task-runtime")]
-use crate::runtime::task::{TaskMetricsSnapshot, TaskRuntimeMetrics, WorkerState};
+use crate::task::{TaskMetricsSnapshot, TaskRuntimeMetrics, WorkerState};
 
 // ============================================================================
 // Runtime Statistics Tracking
@@ -474,7 +474,7 @@ fn register_std_runtime_symbols(registry: &SymbolRegistry) {
 }
 
 inventory::submit! {
-    crate::runtime::ffi::SymbolProvider {
+    crate::ffi::SymbolProvider {
         namespace: "runtime",
         autoload: false,
         register: register_std_runtime_symbols,
