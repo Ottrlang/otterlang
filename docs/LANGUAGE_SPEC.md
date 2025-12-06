@@ -1,6 +1,6 @@
 # OtterLang Language Specification
 
-This document describes the syntax and semantics implemented by the current OtterLang compiler, runtime, LSP server, and standard library. Code samples use the fully supported `fn` syntax and reflect the features shipped in this repository.
+This document describes the syntax and semantics implemented by the OtterLang compiler, runtime, LSP server, and standard library that live in this repository. All examples and descriptions below have been checked against the parser, type checker, and runtime in `main` so they match the behavior you get when building this tree.
 
 ## Table of Contents
 
@@ -47,29 +47,18 @@ Identifiers start with a letter or underscore and may contain ASCII letters, dig
 
 The following words are reserved keywords and cannot be used as identifiers:
 
-**Control Flow:**
-`if`, `elif`, `else`, `for`, `while`, `break`, `continue`, `pass`, `return`, `match`, `case`
+**Control flow:** `if`, `elif`, `else`, `for`, `while`, `break`, `continue`, `pass`, `return`, `match`, `case`
 
-**Functions and Types:**
-`fn`, `struct`, `enum`, `type`, `let`
+**Declarations:** `fn`, `let`, `struct`, `enum`, `pub`, `use`, `as`
 
-**Modules and Visibility:**
-`use`, `pub`, `as`
+**Concurrency:** `await`, `spawn`, `async` (reserved for future `async fn` support)
 
-**Concurrency:**
-`async`, `await`, `spawn`
+**Operators:** `and`, `or`, `not`, `in`, `is`
 
-**Operators:**
-`and`, `or`, `not`, `in`, `is`
+**Literals/Builtins:** `true`, `false`, `None`, `print`
 
-**Literals:**
-`true`, `false`, `None`
-
-**Other:**
-`print`, `pass`
-
-**Contextual Keywords:**
-- `type` - recognized only at the start of type alias declarations
+**Contextual keywords:**
+- `type` — recognized only at the start of type alias declarations; elsewhere it is treated as an identifier
 
 ### Literals
 
@@ -86,16 +75,16 @@ OtterLang uses a static type system with inference. Type annotations are optiona
 
 | Type | Description |
 |------|-------------|
-| `int` / `i64` | 64-bit signed integer |
-| `i32` | 32-bit signed integer |
-| `float` / `f64` | 64-bit floating point |
+| `int` / `i32` | 32-bit signed integer |
+| `i64` | 64-bit signed integer |
+| `float` / `f64` / `number` | 64-bit floating point |
 | `bool` | Boolean value |
 | `str` / `string` | UTF-8 string |
-| `unit` / `None` | Unit type (absence of value) |
+| `unit` / `None` / `()` | Unit type (absence of value) |
 | `list<T>` | Dynamic array of type T |
 | `dict<K, V>` | Dictionary mapping keys of type K to values of type V |
 
-Any other identifier is treated as a custom type name (e.g., `User`, `Channel<string>`). For dynamic typing, use the conventional `any` type alias.
+Any other identifier is treated as a custom type or a type alias (e.g., `User`, `Channel<string>`). Type annotations currently consist of a simple identifier with optional generic arguments—there is no separate syntax for tuple or function types yet.
 
 ### Type Annotations
 
@@ -110,16 +99,21 @@ fn len_text(text: string) -> int:
 
 ### Generics
 
-Functions, structs, enums, and type aliases support generic parameters:
+Structs, enums, and `type` aliases support generic parameters:
 
 ```otter
-fn first<T>(items: list<T>) -> T:
-    return items[0]
-
 struct Pair<T, U>:
     first: T
     second: U
+
+pub type Response<T> = Result<T, Error>
+
+pub enum Option<T>:
+    Some: (T)
+    None
 ```
+
+Functions do not currently accept `<T>` parameter lists; shared generic behavior is modeled through parameterized data structures and type aliases instead.
 
 ### Type Aliases
 
@@ -183,33 +177,27 @@ let squares = [x * x for x in 0..10]
 let indexed = {x: idx for idx in 0..len(items) if items[idx] != None}
 ```
 
+Both forms currently expect the iterable expression to evaluate to a list. Use the `range(start, end)` helper (or a pre-built list) when feeding numeric ranges into comprehensions.
+
 ### Range Expressions
 
-`start..end` produces a range expression. Ranges are evaluated eagerly inside `for` loops and are exclusive of `end`.
+`start..end` is shorthand syntax for building a range. The current compiler only lowers this form when it appears in a `for` loop header; other contexts should call `range(start, end)` from `stdlib/otter/builtins.ot`. Ranges materialize eagerly and are exclusive of `end`.
 
 ```otter
 for i in 0..count:
     println(str(i))
 ```
 
-### Anonymous Functions
-
-Anonymous functions can be created using `fn` syntax:
-
-```otter
-let doubler = fn (value: int) -> int: value * 2
-let handler = fn (event):
-    if event.kind == "update":
-        process(event)
-```
-
 ### Await and Spawn
 
-`await` consumes the result of an asynchronous computation. `spawn` starts an asynchronous computation and returns a task handle.
+`spawn` must be followed by a call expression (`spawn fetch_data(url)`). It schedules that call on the runtime task scheduler and returns an opaque handle. Captured variables are copied into the spawned context, so use channels or shared structures if you need to send a result back.
+
+`await handle` is a thin wrapper around `task.join(handle)`: it blocks until the task finishes and currently returns `unit`. The callee must write results into shared state (channels, maps, etc.) before finishing if you need to read anything after awaiting.
 
 ```otter
-let task = spawn fetch_data(url)
-let payload = await task
+let worker = spawn fetch_data(url)
+// ...
+await worker
 ```
 
 ### F-Strings and Interpolation
@@ -264,7 +252,7 @@ while remaining > 0:
 
 #### `for`
 
-`for` iterates over any iterable expression. Ranges are the easiest way to create numeric loops.
+`for` iterates over lists and strings. A `start..end` expression in the loop header is treated specially by the compiler and expanded into a temporary list. Map iteration and custom iterator protocols are not wired up yet.
 
 ```otter
 for user in users:
@@ -320,11 +308,11 @@ fn main():
 
 - Functions are declared with `fn` followed by the function name, parameters in parentheses, optional return type, and a colon
 - Parameters can have default values. Once a parameter declares a default, all subsequent parameters must also declare defaults
-- Functions may declare type parameters: `fn parse<T>(text: string) -> T`
-- Nested functions are allowed
-- Method definitions live inside `struct` blocks and take `self` explicitly as the first parameter
+- Functions currently cannot declare `<T>` parameter lists.
+- Function declarations are only permitted at module scope; define helpers as separate top-level functions.
+- Method definitions live inside `struct` blocks. The parser automatically inserts `self: StructName` as the first parameter if you omit it.
 
-Top-level code may only contain function definitions, `let` statements, struct/enum/type declarations, `use`/`pub use` statements, and expression statements. Other control-flow constructs must appear inside functions.
+Top-level code may contain `fn` definitions, `let` bindings, `struct`/`enum`/`type` declarations, `use`/`pub use` statements, and expression statements. Control-flow constructs such as `if`/`for` must appear inside one of those blocks.
 
 ## Structs
 
@@ -366,45 +354,51 @@ Patterns allow destructuring and conditional matching in `match` expressions and
 | Literal | `42`, `"hello"`, `true` | Matches exact values |
 | Enum | `Result.Ok(value)` | Matches enum variants with payloads |
 | Struct | `Point{x, y}` | Destructures struct fields |
-| List | `[head, ..rest]` | Matches list elements |
+| List | `[head, tail]..rest` | Matches fixed leading elements with an optional trailing capture |
 
 Patterns are used in:
 - `match` expression case clauses
-- Destructuring `let` bindings
-- Function parameters (planned)
+
+Destructuring `let` bindings and pattern parameters are not implemented yet.
 
 ## Modules and Visibility
 
-Each `.ot` file defines a module. Items are private by default. Mark functions, structs, enums, `let` bindings, and type aliases with `pub` to export them. The compiler supports two import forms:
+Each `.ot` file defines a module. Items are private by default. Mark functions, structs, enums, `let` bindings, and type aliases with `pub` to export them. A `use` statement may import one or more module paths separated by commas, and each path may provide an alias:
 
 ```otter
 use std/io as io
 use math, std/time as time
-
-pub use core.Option
-pub use math.sqrt as square_root
 ```
 
-Only the built-in primitives (enums, `Option`/`Result`, `panic`, `print`, `len`, and the core String/List/Map helpers plus arithmetic) live in the implicit prelude. Every other stdlib module—`http`, `json`, `io`, `sys`, `net`, `runtime`, `task`, etc.—must be imported with `use module_name` before its dotted members (`module.fn`) become visible.
+`pub use` re-exports either an entire module (`pub use math`) or a specific symbol (`pub use math.sqrt as square_root`). Unlike `use`, the `pub use` syntax accepts only a single path; you can re-export multiple items by writing multiple statements.
 
-Module paths consist of segments separated by `/` or `:` (`use std/io`) and may start with `.` or `..` for relative imports. Transparent Rust FFI uses the same mechanism (`use rust:serde/json`).
+Only the built-in primitives (enums, `Option`/`Result`, `panic`, `print`, `len`, and the core string/list/map helpers plus arithmetic) live in the implicit prelude. Every other stdlib module—`http`, `json`, `io`, `sys`, `net`, `runtime`, `task`, etc.—must be imported before its dotted members (`module.fn`) become visible.
 
-`pub use` statements re-export items or entire modules. `pub use math` re-exports everything that `math` already exposes as `pub`.
+Module paths consist of segments separated by `/` or `:` (`use std/io`). Paths may begin with `.` or `..` for relative imports, and transparent Rust FFI uses the same mechanism (`use rust:serde/json`).
 
 ## Concurrency Primitives
 
-OtterLang currently ships two levels of concurrency support:
+OtterLang currently ships two layers of concurrency support:
 
-1. **Language-level operators**: `spawn fn_call(...)` runs a function asynchronously and returns a task handle. `await handle` waits for completion and yields the underlying result.
-2. **Standard library**: `stdlib/otter/task.ot` exposes helpers for spawning tasks, joining/detaching them, sleeping, working with typed channels, and building `select` statements.
+1. **Language-level operators**: `spawn fn_call(...)` schedules a function call on the task runtime and returns a handle. `await handle` blocks until the task finishes (returning `unit`). Exchange data through shared state or `task` channels if you need to observe a result after awaiting.
+2. **Standard library**: `stdlib/otter/task.ot` exposes helpers for spawning tasks, joining or detaching handles, sleeping, working with typed channels, and building `select` statements. `stdlib/otter/sync` adds mutexes, wait groups, atomics, and `Once` primitives for coordinating work across threads.
 
 Example:
 
 ```otter
-let worker = spawn process_batch(batch)
-let snapshot = spawn fetch_snapshot()
-let batch_result = await worker
-let snapshot_result = await snapshot
+use task
+
+fn process_batch(batch: list<int>, sink: Channel<string>):
+    # write the summary where the caller can read it later
+    task.send_string(sink, f"processed {len(batch)} items")
+
+fn main():
+    let batch = [1, 2, 3]
+    let results = task.channel_string()
+    let worker = spawn process_batch(batch, results)
+    await worker
+    let summary = task.recv_string(results)
+    println(summary)
 ```
 
 ## Error Handling
@@ -414,6 +408,7 @@ OtterLang uses `Result<T, E>` enum for error handling. Functions return `Result.
 - `Result<T, E>` and `Option<T>` live in `stdlib/otter/core.ot` and provide algebraic error handling.
 - `panic(message)` is a built-in for unrecoverable failures.
 - Use `match` expressions to handle `Result` and `Option` values.
+- The `exceptions` runtime module surfaces lower-level exception state for FFI integrations, but the language itself does not raise/catch exceptions.
 
 ## Standard Library Overview
 
@@ -429,20 +424,25 @@ The `stdlib/otter` directory contains the modules shipped with the compiler. Imp
 - **math** – numeric algorithms (`sqrt`, `pow`, `exp`, `clamp`, `randf`, etc.).
 - **net** – TCP-style networking primitives plus HTTP response helpers.
 - **rand** – RNG seeding plus integer/float random generators.
-- **runtime** – introspection helpers (`gos`, `cpu_count`, `memory`, `stats`, `version`).
-- **task** – task spawning, sleeping, typed channels, and select utilities.
+- **runtime** – introspection and GC helpers (`gos`, `cpu_count`, `memory`, `stats`, `collect_garbage`).
+- **sys** – host information (`cores`, memory totals), environment variables, and process termination helpers.
+- **sync** – mutexes, wait groups, once cells, and atomics for cross-thread coordination.
+- **task** – task spawning, sleeping, typed channels, select helpers, and task metrics.
 - **time** – timestamps, sleeping, timers, formatting, and parsing.
+- **yaml** – parsing and emitting YAML strings.
+- **exceptions** – access to the runtime exception buffer for FFI integrations.
+- **test** – helpers for building simple assertions and test harnesses.
 
-Each module is pure OtterLang code and may be used as a reference for idiomatic syntax.
+Many of these modules are implemented in OtterLang (`stdlib/otter/*.ot`), while others (e.g., `http`, `exceptions`, `sync`) are written in Rust and exposed through the symbol registry. You always import them with the same `use module_name` syntax.
 
 ## Grammar
 
-The summary below mirrors the parser implementation in [`crates/parser/src/grammar.rs`](../crates/parser/src/grammar.rs). Whitespace and indentation management are omitted for brevity. Keywords are shown in `bold`, literals in *italics*, and optional elements in `[square brackets]`.
+The summary below mirrors the parser implementation in [`crates/otterc_parser/src/grammar.rs`](../crates/otterc_parser/src/grammar.rs). Whitespace and indentation are omitted for brevity. Optional elements appear in `[square brackets]`.
 
 ### Program Structure
 
 ```
-program         := (statement | use_stmt | pub_use_stmt | type_alias | struct_def | enum_def | function)*
+program         := (use_stmt | pub_use_stmt | type_alias | struct_def | enum_def | function | statement)*
 statement       := let_stmt | assignment_stmt | augmented_assignment | return_stmt
                    | break_stmt | continue_stmt | pass_stmt | if_stmt | while_stmt
                    | for_stmt | match_stmt | expr_stmt
@@ -451,18 +451,17 @@ statement       := let_stmt | assignment_stmt | augmented_assignment | return_st
 ### Modules and Imports
 
 ```
-use_stmt        := "use" module_path ["as" identifier]
-pub_use_stmt    := "pub" "use" module_path ["as" identifier]
-module_path     := identifier (":" identifier | "/" identifier)*
+use_stmt        := "use" use_import ("," use_import)*
+use_import      := module_path ["as" identifier]
+pub_use_stmt    := "pub" "use" module_path ["." identifier] ["as" identifier]
+module_path     := path_segment (("/" | ":") path_segment)*
+path_segment    := identifier | "." | ".."
 ```
 
-### Types and Type Definitions
+### Types and Type Aliases
 
 ```
-type            := identifier ["<" type_args ">"] | primitive_type | func_type
-type_args       := type ("," type)*
-primitive_type  := "int" | "i32" | "float" | "f64" | "bool" | "str" | "string" | "unit"
-func_type       := "(" [type ("," type)*] ")" "->" type
+type            := identifier ["<" type ("," type)* ">"]
 type_alias      := ["pub"] "type" identifier ["<" type_params ">"] "=" type
 type_params     := identifier ("," identifier)*
 ```
@@ -470,54 +469,62 @@ type_params     := identifier ("," identifier)*
 ### Functions
 
 ```
-function        := ["pub"] "fn" identifier ["<" type_params ">"] "(" [params] ")" ["->" type] ":" block
+function        := ["pub"] "fn" identifier "(" [params] ")" ["->" type] ":" block
 params          := param ("," param)*
-param           := identifier ":" type ["=" expr]
-block           := NEWLINE INDENT statement* DEDENT
+param           := identifier [":" type] ["=" expr]
+block           := NEWLINE INDENT statement+ DEDENT
 ```
 
 ### Structs and Enums
 
 ```
-struct_def      := ["pub"] "struct" identifier ["<" type_params ">"] ":" NEWLINE INDENT (struct_field | method)* DEDENT
+struct_def      := ["pub"] "struct" identifier ["<" type_params ">"] ":" NEWLINE
+                   INDENT struct_item* DEDENT
+struct_item     := struct_field NEWLINE | method_def
 struct_field    := identifier ":" type
-method          := "fn" identifier "(" [params] ")" ["->" type] ":" block
+method_def      := "fn" identifier "(" [params] ")" ["->" type] ":" block
 
-enum_def        := ["pub"] "enum" identifier ["<" type_params ">"] ":" NEWLINE INDENT enum_variant+ DEDENT
-enum_variant    := identifier ["(" type ")"]
+enum_def        := ["pub"] "enum" identifier ["<" type_params ">"] ":" NEWLINE
+                   INDENT enum_variant+ DEDENT
+enum_variant    := identifier [":" "(" type ("," type)* ")"]
 ```
 
 ### Expressions
 
 ```
-expr            := primary_expr | unary_expr | binary_expr | await_expr
-                   | spawn_expr | range_expr | comprehension | if_expr | match_expr
-
-primary_expr    := literal | identifier | "(" expr ")" | struct_init | list_literal
-                   | dict_literal | call_expr | member_expr | index_expr
-
-literal         := INTEGER | FLOAT | STRING | "true" | "false" | "None" | "()"
-INTEGER         := [0-9]+ | "0x" [0-9a-fA-F]+ | "0b" [01]+
-FLOAT           := [0-9]+ "." [0-9]* | [0-9]+ ("e"|"E") ["+"|"-"] [0-9]+
-STRING          := "\"" ([^"\\] | "\\" .)* "\"" | "'" ([^'\\] | "\\" .)* "'"
-
-struct_init     := identifier "(" [field_init ("," field_init)*] ")"
+expr            := logical_or_expr
+logical_or_expr := logical_and_expr ("or" logical_and_expr)*
+logical_and_expr:= comparison_expr ("and" comparison_expr)*
+comparison_expr := range_expr ((comparison_op | is_op) range_expr)*
+comparison_op   := "==" | "!=" | "<" | "<=" | ">" | ">="
+is_op           := "is" ["not"]
+range_expr      := additive_expr [".." additive_expr]
+additive_expr   := multiplicative_expr (("+" | "-") multiplicative_expr)*
+multiplicative_expr := unary_expr (("*" | "/" | "%") unary_expr)*
+unary_expr      := ("not" | "!" | "-" | "+") unary_expr
+                 | await_expr
+                 | spawn_expr
+                 | call_expr
+await_expr      := "await" call_expr
+spawn_expr      := "spawn" call_expr
+call_expr       := member_expr ("(" [expr ("," expr)*] ")")*
+member_expr     := primary_expr ("." identifier)*
+primary_expr    := literal
+                 | identifier
+                 | "(" expr ")"
+                 | struct_init
+                 | list_literal
+                 | dict_literal
+                 | list_comprehension
+                 | dict_comprehension
+literal         := INTEGER | FLOAT | STRING | FSTRING | "true" | "false" | "None" | "()"
+struct_init     := identifier "(" field_init ("," field_init)* ")"
 field_init      := identifier "=" expr
 list_literal    := "[" [expr ("," expr)*] "]"
 dict_literal    := "{" [dict_entry ("," dict_entry)*] "}"
 dict_entry      := expr ":" expr
-
-call_expr       := expr "(" [expr ("," expr)*] ")"
-member_expr     := expr "." identifier
-index_expr      := expr "[" expr "]"
-
-await_expr      := "await" expr
-spawn_expr      := "spawn" expr
-range_expr      := expr ".." expr
-comprehension   := "[" expr "for" identifier "in" expr ["if" expr] "]"
-                 | "{" expr ":" expr "for" identifier "in" expr ["if" expr] "}"
-
-if_expr         := "if" expr ":" expr ("elif" expr ":" expr)* ["else" ":" expr]
+list_comprehension := "[" expr "for" identifier "in" expr ["if" expr] "]"
+dict_comprehension := "{" expr ":" expr "for" identifier "in" expr ["if" expr] "}"
 ```
 
 ### Statements
@@ -525,7 +532,7 @@ if_expr         := "if" expr ":" expr ("elif" expr ":" expr)* ["else" ":" expr]
 ```
 let_stmt        := ["pub"] "let" identifier [":" type] "=" expr
 assignment_stmt := identifier "=" expr
-augmented_assignment := identifier ("+=" | "-=" | "*=" | "/=" | "%=") expr
+augmented_assignment := identifier ("+=" | "-=" | "*=" | "/=") expr
 
 return_stmt     := "return" [expr]
 break_stmt      := "break"
@@ -534,7 +541,7 @@ pass_stmt       := "pass"
 
 if_stmt         := "if" expr ":" block ("elif" expr ":" block)* ["else" ":" block]
 while_stmt      := "while" expr ":" block
-for_stmt        := "for" identifier ["in" expr] ":" block
+for_stmt        := "for" identifier "in" expr ":" block
 
 match_stmt      := "match" expr ":" NEWLINE INDENT match_case+ DEDENT
 match_case      := "case" pattern ":" block
@@ -552,7 +559,7 @@ identifier_pattern  := identifier
 enum_pattern        := identifier "." identifier ["(" pattern ("," pattern)* ")"]
 struct_pattern      := identifier "{" [field_pattern ("," field_pattern)*] "}"
 field_pattern       := identifier [":" pattern]
-list_pattern        := "[" [pattern ("," pattern)* ["," ".." identifier]] "]"
+list_pattern        := "[" [pattern ("," pattern)*] "]" [".." identifier]
 ```
 
 ### Operators and Precedence
@@ -560,24 +567,24 @@ list_pattern        := "[" [pattern ("," pattern)* ["," ".." identifier]] "]"
 Operators are listed from highest to lowest precedence:
 
 ```
-Primary:     () [] . () (function call)
-Unary:       not - +
+Primary:     () [] . call
+Unary:       await spawn not ! + -
 Multiplicative: * / %
 Additive:    + -
+Range:       ..
 Comparison:  == != < <= > >= is is not
 Logical AND: and
 Logical OR:  or
-Range:       ..
 ```
 
 ### Lexical Structure
 
 ```
-identifier      := [a-zA-Z_][a-zA-Z0-9_]*
+identifier      := [a-zA-Z_][a-zA-Z0-9_]* (Unicode identifiers are also accepted)
 keyword         := fn | let | return | if | elif | else | for | while
-                   | match | case | struct | enum
-                   | type | pub | async | await | spawn | true | false | None
-                   | and | or | not | in | is | as | use | break | continue | pass | print
+                   | match | case | struct | enum | pub | async | await | spawn
+                   | true | false | None | and | or | not | in | is | as | use
+                   | break | continue | pass | print
 comment         := "#" [^\n]*
 whitespace      := [ \t\n\r]+
 ```
@@ -586,6 +593,7 @@ whitespace      := [ \t\n\r]+
 
 - **Type Checking** – Static type checking with inference is performed before code generation. Generic parameters default to unconstrained type variables.
 - **Evaluation Order** – Expressions evaluate left-to-right. Function arguments are evaluated before the call.
-- **Memory Management** – The runtime manages memory automatically using reference counting and runtime support utilities in `runtime/`.
-- **Code Generation** – The `otter` binary can target LLVM or Cranelift backends. Both backends eventually emit machine code to run programs natively.
-- **Tooling** – The repository ships a formatter, language server, REPL, and VS Code syntax highlighter that all understand the syntax described in this document.
+- **Memory Management** – The runtime ships multiple GC strategies (reference counting for short-lived objects, mark-and-sweep, and arena allocators) that can be selected via `runtime/memory` configuration. Modules such as `gc` and `runtime` expose helpers for GC control from Otter code.
+- **Code Generation** – The `otter` binary currently targets LLVM for JIT/native code generation.
+- **Task Runtime** – `spawn`, `await`, `task.*` helpers, and `sync` primitives are thin wrappers around the scheduler implemented in `src/runtime/task`, so task handles, typed channels, and wait groups interoperate consistently.
+- **Tooling** – The repository ships a formatter, language server, REPL, and VS Code extension that all understand the syntax described in this document.

@@ -34,14 +34,11 @@
           let
             llvm = pkgs.llvmPackages_18;
 
-            rust_toolchain = (
-              rust-bin.nightly.latest.default.override {
-                extensions = [
-                  "rust-src"
-                  "rustc-codegen-cranelift-preview"
-                ];
-              }
-            );
+            rust_toolchain = rust-bin.nightly.latest.default.override {
+              extensions = [
+                "rust-src"
+              ];
+            };
           in
           mkShell {
             buildInputs = [
@@ -71,7 +68,6 @@
               + " -C link-args=-Wl,-rpath,${pkgs.ncurses}/lib"
               + " -C link-args=-Wl,-rpath,${pkgs.stdenv.cc.cc.lib}/lib";
 
-            CARGO_PROFILE_DEV_CODEGEN_BACKEND = (if hasInfix "linux" system then "cranelift" else "llvm");
             CARGO_NET_GIT_FETCH_WITH_CLI = "true";
             shellHook = ''
               if [ -z "''${OTTER_DEV_AUTOUPDATE:-}" ]; then
