@@ -33,7 +33,7 @@ OtterLang is an indentation-sensitive programming language with an LLVM backend 
 
 - 🎯 **Simple syntax** – Indentation-driven, no braces or semicolons
 - ⚡ **Native performance** – Compiles to native binaries with LLVM
-- 🔗 **Transparent Rust FFI** – Import any Rust crate with `use rust:crate_name` (very barebones & experimental)
+- 🔗 **Transparent Rust FFI** – Import any Rust crate with `use rust:crate_name` (very barebones)
 - 🛡️ **Memory safety** – Generational garbage collection with explicit root APIs
 - 🧵 **Concurrency** – Built-in async task runtime
 - 📦 **Rich standard library** – Comprehensive stdlib covering IO, networking, JSON, and more
