@@ -167,9 +167,9 @@ impl TypeInfo {
             | (TypeInfo::I32, TypeInfo::I64) | (TypeInfo::I32, TypeInfo::F64)
             | (TypeInfo::I64, TypeInfo::F64)
             // Unknown types are compatible with anything (during inference)
-            | (TypeInfo::Unknown, _) | (_, TypeInfo::Unknown)
+            | (TypeInfo::Unknown, _) | (_, TypeInfo::Unknown) => true,
             // Error types are compatible with strings (for convenience) and themselves
-            | (TypeInfo::Error, TypeInfo::Error)
+            (TypeInfo::Error, TypeInfo::Error)
             | (TypeInfo::Str, TypeInfo::Error) // Allow raising strings as errors
             | (TypeInfo::Error, _) // Error types are not compatible with anything else
             | (_, TypeInfo::Error) => false, // Nothing else is compatible with Error (except strings above)
