@@ -149,7 +149,7 @@ Contributions are welcome with open arms as we look to foster a community. Pleas
   <img src="https://contrib.rocks/image?repo=jonathanmagambo/otterlang" />
 </a>
 
-Made with [contrib.rocks](https://contrib.rocks).
+Thank you so much to all our contributors! ❤️
 
 ![Alt](https://repobeats.axiom.co/api/embed/311d7c69bcf9daf0ef09f03cb6e369994f71b519.svg "Repobeats analytics image")
 
