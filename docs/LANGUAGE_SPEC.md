@@ -51,7 +51,7 @@ The following words are reserved keywords and cannot be used as identifiers:
 
 **Declarations:** `fn`, `let`, `struct`, `enum`, `pub`, `use`, `as`
 
-**Concurrency:** `await`, `spawn`, `async` (reserved for future `async fn` support)
+**Concurrency:** `await`, `spawn`
 
 **Operators:** `and`, `or`, `not`, `in`, `is`
 
@@ -582,7 +582,7 @@ Logical OR:  or
 ```
 identifier      := [a-zA-Z_][a-zA-Z0-9_]* (Unicode identifiers are also accepted)
 keyword         := fn | let | return | if | elif | else | for | while
-                   | match | case | struct | enum | pub | async | await | spawn
+                   | match | case | struct | enum | pub | await | spawn
                    | true | false | None | and | or | not | in | is | as | use
                    | break | continue | pass | print
 comment         := "#" [^\n]*

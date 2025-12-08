@@ -96,7 +96,6 @@ fn identifier_or_keyword_parser() -> impl Parser<TokenKind, String, Error = Simp
         TokenKind::Not => "not".to_string(),
         TokenKind::Use => "use".to_string(),
         TokenKind::As => "as".to_string(),
-        TokenKind::Async => "async".to_string(),
         TokenKind::Await => "await".to_string(),
         TokenKind::Spawn => "spawn".to_string(),
         TokenKind::Match => "match".to_string(),

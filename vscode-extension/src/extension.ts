@@ -280,7 +280,6 @@ const stdlibCompletions: vscode.CompletionItem[] = [
     { label: 'enum', kind: vscode.CompletionItemKind.Keyword, detail: 'enum definition', documentation: 'Enum type definition' },
     { label: 'use', kind: vscode.CompletionItemKind.Keyword, detail: 'use module', documentation: 'Import a module' },
     { label: 'pub', kind: vscode.CompletionItemKind.Keyword, detail: 'pub visibility', documentation: 'Public visibility modifier' },
-    { label: 'async', kind: vscode.CompletionItemKind.Keyword, detail: 'async function', documentation: 'Asynchronous function' },
     { label: 'await', kind: vscode.CompletionItemKind.Keyword, detail: 'await expression', documentation: 'Await an async operation' },
     { label: 'spawn', kind: vscode.CompletionItemKind.Keyword, detail: 'spawn expression', documentation: 'Spawn an async task' },
 ];

@@ -75,7 +75,7 @@
         },
         {
           "name": "keyword.other.otterlang",
-          "match": "\\b(fn|let|pub|struct|enum|type|use|from|as|in|and|or|not|is|lambda|async)\\b"
+          "match": "\\b(fn|let|pub|struct|enum|type|use|from|as|in|and|or|not|is|lambda)\\b"
         },
         {
           "name": "constant.language.boolean.otterlang",
@@ -143,28 +143,6 @@
     },
     "function-definition": {
       "patterns": [
-        {
-          "name": "meta.function.async.otterlang",
-          "begin": "\\basync\\s+fn\\b",
-          "beginCaptures": {
-            "0": {
-              "name": "keyword.other.async.otterlang"
-            }
-          },
-          "end": ":",
-          "patterns": [
-            {
-              "name": "entity.name.function.otterlang",
-              "match": "\\b[a-zA-Z_][a-zA-Z0-9_]*\\b"
-            },
-            {
-              "include": "#function-parameters"
-            },
-            {
-              "include": "#type-annotation"
-            }
-          ]
-        },
         {
           "name": "meta.function.otterlang",
           "begin": "\\b(pub\\s+)?fn\\b",

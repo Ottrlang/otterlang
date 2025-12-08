@@ -775,7 +775,6 @@ impl LexerState {
             "use" => TokenKind::Use,
             "as" => TokenKind::As,
             "pub" => TokenKind::Pub,
-            "async" => TokenKind::Async,
             "await" => TokenKind::Await,
             "spawn" => TokenKind::Spawn,
             "match" => TokenKind::Match,

@@ -22,7 +22,6 @@ pub enum TokenKind {
     Use,
     As,
     Pub,
-    Async,
     Await,
     Spawn,
     Match,
@@ -111,19 +110,18 @@ impl Hash for TokenKind {
             TokenKind::Use => 14u16.hash(state),
             TokenKind::As => 15u16.hash(state),
             TokenKind::Pub => 16u16.hash(state),
-            TokenKind::Async => 17u16.hash(state),
-            TokenKind::Await => 18u16.hash(state),
-            TokenKind::Spawn => 19u16.hash(state),
-            TokenKind::Match => 20u16.hash(state),
-            TokenKind::Case => 21u16.hash(state),
-            TokenKind::True => 22u16.hash(state),
-            TokenKind::False => 23u16.hash(state),
-            TokenKind::Print => 24u16.hash(state),
-            TokenKind::None => 25u16.hash(state),
-            TokenKind::Struct => 26u16.hash(state),
-            TokenKind::Enum => 27u16.hash(state),
-            TokenKind::And => 28u16.hash(state),
-            TokenKind::Or => 29u16.hash(state),
+            TokenKind::Await => 17u16.hash(state),
+            TokenKind::Spawn => 18u16.hash(state),
+            TokenKind::Match => 19u16.hash(state),
+            TokenKind::Case => 20u16.hash(state),
+            TokenKind::True => 21u16.hash(state),
+            TokenKind::False => 22u16.hash(state),
+            TokenKind::Print => 23u16.hash(state),
+            TokenKind::None => 24u16.hash(state),
+            TokenKind::Struct => 25u16.hash(state),
+            TokenKind::Enum => 26u16.hash(state),
+            TokenKind::And => 27u16.hash(state),
+            TokenKind::Or => 28u16.hash(state),
 
             // Identifiers
             TokenKind::Identifier(name) => {
@@ -222,7 +220,6 @@ impl TokenKind {
             TokenKind::Use => "use",
             TokenKind::As => "as",
             TokenKind::Pub => "pub",
-            TokenKind::Async => "async",
             TokenKind::Await => "await",
             TokenKind::Spawn => "spawn",
             TokenKind::Match => "match",
@@ -337,7 +334,6 @@ impl Token {
                 | TokenKind::Use
                 | TokenKind::As
                 | TokenKind::Pub
-                | TokenKind::Async
                 | TokenKind::Await
                 | TokenKind::Spawn
                 | TokenKind::Match

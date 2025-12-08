@@ -189,14 +189,6 @@
         ],
         "description": "Function with type hints"
     },
-    "Async Function": {
-        "prefix": "async",
-        "body": [
-            "async fn ${1:function_name}(${2:params}):",
-            "    ${0:pass}"
-        ],
-        "description": "Async function definition"
-    },
     "Property Decorator": {
         "prefix": "prop",
         "body": [
