@@ -111,6 +111,11 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
 
+          if (Test-Path Env:VCPKG_ROOT) {
+            Write-Host "Clearing existing VCPKG_ROOT to avoid mismatched roots"
+            Remove-Item Env:VCPKG_ROOT
+          }
+
           $vcpkgRoot = Join-Path $env:RUNNER_TEMP "vcpkg"
           if (Test-Path $vcpkgRoot) {
             Remove-Item $vcpkgRoot -Recurse -Force
@@ -122,8 +127,51 @@ jobs:
           Write-Host "Bootstrapping vcpkg..."
           & "$vcpkgRoot\bootstrap-vcpkg.bat" -disableMetrics | Out-Null
 
+          # Ensure a recent ninja is available so vcpkg doesn't need to download one
+          $ninjaVersion = "1.13.1"
+          $ninjaDir = Join-Path $env:RUNNER_TEMP "ninja-$ninjaVersion"
+          $ninjaExe = Join-Path $ninjaDir "ninja.exe"
+          if (-not (Test-Path $ninjaExe)) {
+            New-Item -ItemType Directory -Path $ninjaDir -Force | Out-Null
+            $ninjaUrl = "https://github.com/ninja-build/ninja/releases/download/v$ninjaVersion/ninja-win.zip"
+            $ninjaArchive = Join-Path $env:RUNNER_TEMP "ninja-win.zip"
+            $maxAttempts = 5
+            for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+              try {
+                Write-Host "Downloading ninja $ninjaVersion (attempt $attempt)..."
+                Invoke-WebRequest -Uri $ninjaUrl -OutFile $ninjaArchive -UseBasicParsing
+                break
+              } catch {
+                if ($attempt -eq $maxAttempts) {
+                  throw $_
+                }
+                $delay = [Math]::Min(30, 5 * $attempt)
+                Write-Host "Download failed, retrying in $delay seconds..."
+                Start-Sleep -Seconds $delay
+              }
+            }
+            Expand-Archive -Path $ninjaArchive -DestinationPath $ninjaDir -Force
+            Remove-Item $ninjaArchive -ErrorAction SilentlyContinue
+          }
+          $env:PATH = "$ninjaDir;$env:PATH"
+          "$ninjaDir" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          Write-Host "ninja version:"; & $ninjaExe --version
+
           Write-Host "Installing libxml2 via vcpkg..."
-          & "$vcpkgRoot\vcpkg.exe" install libxml2:x64-windows --clean-after-build
+          $maxInstallAttempts = 3
+          for ($attempt = 1; $attempt -le $maxInstallAttempts; $attempt++) {
+            & "$vcpkgRoot\vcpkg.exe" install libxml2:x64-windows --clean-after-build
+            $exitCode = $LASTEXITCODE
+            if ($exitCode -eq 0) {
+              break
+            }
+            if ($attempt -eq $maxInstallAttempts) {
+              throw "vcpkg install failed with exit code $exitCode"
+            }
+            $delay = 15 * $attempt
+            Write-Host "vcpkg install failed with exit code $exitCode. Retrying in $delay seconds..."
+            Start-Sleep -Seconds $delay
+          }
 
           $libDir = Join-Path $vcpkgRoot "installed\x64-windows\lib"
           $primaryLib = Join-Path $libDir "libxml2.lib"

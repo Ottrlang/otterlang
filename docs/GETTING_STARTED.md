@@ -165,10 +165,11 @@ The included Powershell script `setup.ps1` prepares your environment to build Ot
 
 1. Inits the Visual Studio dev shell, which includes needed environment variables.
 2. Downloads LLVM 18.
-3. Download libxml2.
-4. Setups up PATH and other environment variables so the compiler knows where to find llvm and libxml2.
+3. Installs the Ninja build tool required by vcpkg.
+4. Downloads libxml2.
+5. Sets up PATH and other environment variables so the compiler knows where to find llvm, libxml2, and ninja.
 
-LLVM and libxml2 are installed in the `contrib` folder, which is created by this script. Keep in mind that this script needs to be run in any new powershell instance before building, as it's changes are not permanent.
+LLVM, ninja, and libxml2 are installed in the `contrib` folder, which is created by this script. Keep in mind that this script needs to be run in any new powershell instance before building, as it's changes are not permanent.
 
 
 ```powershell

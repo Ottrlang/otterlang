@@ -20,11 +20,39 @@ if (-not (Test-Path "llvm")) {
     $clang = "clang+llvm-$llvmVersion-x86_64-pc-windows-msvc"
     $archive = "$clang.tar.xz"
     $downloadUrl = "https://github.com/llvm/llvm-project/releases/download/llvmorg-$llvmVersion/$archive"
-    Invoke-WebRequest -Uri $downloadUrl -OutFile $archive
+    Invoke-WebRequest -Uri $downloadUrl -OutFile $archive -UseBasicParsing
     tar -xf $archive
     Move-Item $clang llvm
     Remove-Item $archive
 }
+
+# Ensure Ninja is available (vcpkg requires >= 1.13.1)
+$ninjaDir = Join-Path $contribPath "ninja"
+if (-not (Test-Path $ninjaDir)) {
+    Write-Host "Downloading ninja build tool..."
+    New-Item -ItemType Directory -Path $ninjaDir | Out-Null
+    $ninjaVersion = "1.13.1"
+    $ninjaArchive = Join-Path $contribPath "ninja-win.zip"
+    $ninjaUrl = "https://github.com/ninja-build/ninja/releases/download/v$ninjaVersion/ninja-win.zip"
+    $maxAttempts = 5
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        try {
+            Invoke-WebRequest -Uri $ninjaUrl -OutFile $ninjaArchive -UseBasicParsing
+            break
+        } catch {
+            if ($attempt -eq $maxAttempts) {
+                throw $_
+            }
+            $delay = [Math]::Min(30, 5 * $attempt)
+            Write-Host "Download failed (attempt $attempt). Retrying in $delay seconds..."
+            Start-Sleep -Seconds $delay
+        }
+    }
+    Expand-Archive -Path $ninjaArchive -DestinationPath $ninjaDir -Force
+    Remove-Item $ninjaArchive
+}
+
+$env:PATH = "$ninjaDir;$env:PATH"
 
 # Clone vcpkg
 $vcpkgRoot = "vcpkg"

@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::ffi::c_void;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -21,12 +21,38 @@ use otterc_symbol::registry::{FfiFunction, FfiSignature, FfiType, SymbolRegistry
 type HandleId = u64;
 
 type TaskCallback = extern "C" fn();
+type TaskClosure = extern "C" fn(*mut c_void);
 
 static TASK_HANDLES: Lazy<Mutex<HashMap<HandleId, JoinHandle>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
-static SPAWN_CONTEXTS: Lazy<Mutex<HashMap<u64, VecDeque<u64>>>> =
-    Lazy::new(|| Mutex::new(HashMap::new()));
+struct SpawnContextGuard {
+    ptr: *mut c_void,
+}
+
+impl SpawnContextGuard {
+    fn new(ptr: *mut c_void) -> Self {
+        Self { ptr }
+    }
+
+    fn take(&mut self) -> *mut c_void {
+        let ptr = self.ptr;
+        self.ptr = std::ptr::null_mut();
+        ptr
+    }
+}
+
+impl Drop for SpawnContextGuard {
+    fn drop(&mut self) {
+        if !self.ptr.is_null() {
+            unsafe {
+                libc::free(self.ptr);
+            }
+        }
+    }
+}
+
+unsafe impl Send for SpawnContextGuard {}
 
 fn next_handle_id() -> HandleId {
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -48,22 +74,18 @@ pub extern "C" fn otter_task_spawn(callback: TaskCallback) -> u64 {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn otter_spawn_context_push(thunk_id: u64, ctx: *mut c_void) {
-    if ctx.is_null() {
-        return;
-    }
-    let mut guard = SPAWN_CONTEXTS.lock();
-    guard.entry(thunk_id).or_default().push_back(ctx as u64);
-}
-
-#[unsafe(no_mangle)]
-pub extern "C" fn otter_spawn_context_pop(thunk_id: u64) -> *mut c_void {
-    let mut guard = SPAWN_CONTEXTS.lock();
-    guard
-        .get_mut(&thunk_id)
-        .and_then(|queue| queue.pop_front())
-        .map(|ptr| ptr as *mut c_void)
-        .unwrap_or(std::ptr::null_mut())
+pub extern "C" fn otter_task_spawn_closure(callback: TaskClosure, ctx: *mut c_void) -> u64 {
+    increment_active_tasks();
+    let scheduler = runtime().scheduler().clone();
+    let mut context_guard = SpawnContextGuard::new(ctx);
+    let join = scheduler.spawn_fn(Some("task.spawn".into()), move || {
+        let ctx_ptr = context_guard.take();
+        callback(ctx_ptr);
+        decrement_active_tasks();
+    });
+    let task_id = join.task_id().raw();
+    TASK_HANDLES.lock().insert(task_id, join);
+    task_id
 }
 
 #[unsafe(no_mangle)]

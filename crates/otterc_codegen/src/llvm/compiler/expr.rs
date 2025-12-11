@@ -70,7 +70,7 @@ impl<'ctx> Compiler<'ctx> {
 
         let wrapper = self.build_spawn_wrapper(spawn_id, expr, context_struct, &capture_fields)?;
 
-        if let Some(struct_type) = context_struct {
+        let context_arg = if let Some(struct_type) = context_struct {
             let context_ptr = self.builder.build_malloc(struct_type, "spawn_ctx")?;
             for (index, field) in capture_fields.iter().enumerate() {
                 let var = ctx.get(&field.name).ok_or_else(|| {
@@ -87,22 +87,21 @@ impl<'ctx> Compiler<'ctx> {
                 )?;
                 self.builder.build_store(field_ptr, loaded)?;
             }
-            let raw_ptr = self.builder.build_pointer_cast(
-                context_ptr,
-                self.raw_ptr_type(),
-                "spawn_ctx_raw",
-            )?;
-            let push_fn = self.get_spawn_context_push_fn();
-            let id_const = self.context.i64_type().const_int(spawn_id, false);
             self.builder
-                .build_call(push_fn, &[id_const.into(), raw_ptr.into()], "")?;
-        }
+                .build_pointer_cast(context_ptr, self.raw_ptr_type(), "spawn_ctx_raw")?
+        } else {
+            self.raw_ptr_type().const_null()
+        };
 
         let spawn_fn = self.get_task_spawn_fn();
         let callback_ptr = wrapper.as_global_value().as_pointer_value();
         let handle = self
             .builder
-            .build_call(spawn_fn, &[callback_ptr.into()], "task_handle")?
+            .build_call(
+                spawn_fn,
+                &[callback_ptr.into(), context_arg.into()],
+                "task_handle",
+            )?
             .try_as_basic_value()
             .left()
             .ok_or_else(|| anyhow!("task.spawn did not return a handle"))?;
@@ -118,7 +117,10 @@ impl<'ctx> Compiler<'ctx> {
         captures: &[CapturedVariable<'ctx>],
     ) -> Result<FunctionValue<'ctx>> {
         let fn_name = format!("spawn_wrapper_{}", spawn_id);
-        let fn_type = self.context.void_type().fn_type(&[], false);
+        let fn_type = self
+            .context
+            .void_type()
+            .fn_type(&[self.raw_ptr_type().into()], false);
         let function = self.module.add_function(&fn_name, fn_type, None);
         let entry = self.context.append_basic_block(function, "entry");
         let prev_block = self.builder.get_insert_block();
@@ -128,14 +130,9 @@ impl<'ctx> Compiler<'ctx> {
         let mut raw_ptr: Option<inkwell::values::PointerValue<'ctx>> = None;
 
         if let Some(struct_type) = context_type {
-            let pop_fn = self.get_spawn_context_pop_fn();
-            let id_const = self.context.i64_type().const_int(spawn_id, false);
-            let value = self
-                .builder
-                .build_call(pop_fn, &[id_const.into()], "spawn_ctx_raw")?
-                .try_as_basic_value()
-                .left()
-                .ok_or_else(|| anyhow!("spawn context queue returned null"))?
+            let value = function
+                .get_nth_param(0)
+                .expect("spawn wrapper missing context parameter")
                 .into_pointer_value();
             raw_ptr = Some(value);
             let typed_ptr = self.builder.build_pointer_cast(
@@ -354,51 +351,25 @@ impl<'ctx> Compiler<'ctx> {
         }
     }
 
-    fn get_spawn_context_push_fn(&mut self) -> FunctionValue<'ctx> {
-        if let Some(func) = self.declared_functions.get("__spawn_context_push") {
+    fn get_task_spawn_fn(&mut self) -> FunctionValue<'ctx> {
+        if let Some(func) = self.declared_functions.get("__task_spawn_closure") {
             return *func;
         }
-        let ptr_ty = self.raw_ptr_type();
-        let fn_type = self
+        let callback_type = self
             .context
             .void_type()
-            .fn_type(&[self.context.i64_type().into(), ptr_ty.into()], false);
-        let function = self
-            .module
-            .add_function("otter_spawn_context_push", fn_type, None);
-        self.declared_functions
-            .insert("__spawn_context_push".to_string(), function);
-        function
-    }
-
-    fn get_spawn_context_pop_fn(&mut self) -> FunctionValue<'ctx> {
-        if let Some(func) = self.declared_functions.get("__spawn_context_pop") {
-            return *func;
-        }
-        let ptr_ty = self.raw_ptr_type();
-        let fn_type = ptr_ty.fn_type(&[self.context.i64_type().into()], false);
-        let function = self
-            .module
-            .add_function("otter_spawn_context_pop", fn_type, None);
-        self.declared_functions
-            .insert("__spawn_context_pop".to_string(), function);
-        function
-    }
-
-    fn get_task_spawn_fn(&mut self) -> FunctionValue<'ctx> {
-        if let Some(func) = self.declared_functions.get("__task_spawn") {
-            return *func;
-        }
-        let callback_type = self.context.void_type().fn_type(&[], false);
+            .fn_type(&[self.raw_ptr_type().into()], false);
         #[expect(deprecated, reason = "TODO: Use Context::ptr_type instead")]
         let callback_ptr = callback_type.ptr_type(AddressSpace::default());
         let fn_type = self
             .context
             .i64_type()
-            .fn_type(&[callback_ptr.into()], false);
-        let function = self.module.add_function("otter_task_spawn", fn_type, None);
+            .fn_type(&[callback_ptr.into(), self.raw_ptr_type().into()], false);
+        let function = self
+            .module
+            .add_function("otter_task_spawn_closure", fn_type, None);
         self.declared_functions
-            .insert("__task_spawn".to_string(), function);
+            .insert("__task_spawn_closure".to_string(), function);
         function
     }
 

@@ -68,7 +68,7 @@ impl TypecheckWorkspace {
             let alias = dependency
                 .alias
                 .as_deref()
-                .unwrap_or_else(|| dependency.module.as_str());
+                .unwrap_or(dependency.module.as_str());
             if let Some(dep_record) = self.modules.get(&dependency.module) {
                 checker.import_module_exports(alias, &dep_record.exports);
             }
@@ -146,6 +146,12 @@ impl TypecheckWorkspace {
             }
         }
         deps
+    }
+}
+
+impl Default for TypecheckWorkspace {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
