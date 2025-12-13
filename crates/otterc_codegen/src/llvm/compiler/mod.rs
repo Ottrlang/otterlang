@@ -12,7 +12,7 @@ use inkwell::types::{BasicType, BasicTypeEnum, PointerType, StructType};
 use inkwell::values::{FunctionValue, PointerValue};
 
 use crate::llvm::bridges::prepare_rust_bridges;
-use otterc_ast::nodes::{Block, Expr, FStringPart, Function, Node, Program, Statement};
+use otterc_ast::nodes::{Block, Expr, FStringPart, Function, Node, Program, Statement, TraitMethod};
 use otterc_config::CodegenOptLevel;
 use otterc_config::TargetTriple;
 use otterc_span::Span;
@@ -71,15 +71,33 @@ impl<'ctx> Compiler<'ctx> {
 
     fn record_statement_spans(&mut self, stmt: &Statement) {
         match stmt {
-            Statement::Expr(expr)
-            | Statement::Let { expr, .. }
-            | Statement::Assignment { expr, .. }
-            | Statement::Return(Some(expr)) => self.record_expr_spans(expr),
-            Statement::Impl { methods, .. } => {
+            Statement::Expr(expr) | Statement::Let { expr, .. } | Statement::Return(Some(expr)) => {
+                self.record_expr_spans(expr);
+            }
+            Statement::Assignment { target, expr } => {
+                self.record_expr_spans(target);
+                self.record_expr_spans(expr);
+            }
+            Statement::Impl { methods, .. } | Statement::Struct { methods, .. } => {
                 for method in methods {
                     self.record_function_spans(method.as_ref());
                 }
             }
+            Statement::Trait { methods, .. } => {
+                for method in methods {
+                    if let TraitMethod::DefaultImplementation(func) = method {
+                        self.record_function_spans(func.as_ref());
+                    }
+                }
+            }
+            Statement::Return(None)
+            | Statement::Break
+            | Statement::Continue
+            | Statement::Pass
+            | Statement::Use { .. }
+            | Statement::PubUse { .. }
+            | Statement::Enum { .. }
+            | Statement::TypeAlias { .. } => {}
             Statement::Function(func) => self.record_function_spans(func.as_ref()),
             Statement::If {
                 cond,
@@ -106,7 +124,6 @@ impl<'ctx> Compiler<'ctx> {
                 self.record_block_spans(body.as_ref());
             }
             Statement::Block(block) => self.record_block_spans(block.as_ref()),
-            _ => {}
         }
     }
 

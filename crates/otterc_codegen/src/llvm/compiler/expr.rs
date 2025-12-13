@@ -7,7 +7,9 @@ use std::collections::BTreeSet;
 
 use crate::llvm::compiler::Compiler;
 use crate::llvm::compiler::types::{EvaluatedValue, FunctionContext, OtterType, Variable};
-use otterc_ast::nodes::{BinaryOp, Block, Expr, FStringPart, Literal, Node, Statement, UnaryOp};
+use otterc_ast::nodes::{
+    BinaryOp, Block, Expr, FStringPart, Function, Literal, Node, Statement, TraitMethod, UnaryOp,
+};
 use otterc_typecheck::TypeInfo;
 
 struct CapturedVariable<'ctx> {
@@ -305,11 +307,28 @@ impl<'ctx> Compiler<'ctx> {
         captures: &mut BTreeSet<String>,
     ) {
         match stmt {
-            Statement::Expr(expr)
-            | Statement::Let { expr, .. }
-            | Statement::Assignment { expr, .. }
-            | Statement::Return(Some(expr)) => {
+            Statement::Expr(expr) | Statement::Let { expr, .. } | Statement::Return(Some(expr)) => {
                 self.collect_captured_names(expr.as_ref(), ctx, captures);
+            }
+            Statement::Assignment { target, expr } => {
+                self.collect_captured_names(target.as_ref(), ctx, captures);
+                self.collect_captured_names(expr.as_ref(), ctx, captures);
+            }
+            Statement::Trait { methods, .. } => {
+                for method in methods {
+                    if let TraitMethod::DefaultImplementation(func) = method {
+                        self.collect_captured_names_in_block(
+                            func.as_ref().body.as_ref(),
+                            ctx,
+                            captures,
+                        );
+                    }
+                }
+            }
+            Statement::Impl { methods, .. } => {
+                for method in methods {
+                    self.collect_captured_names_in_block(method.as_ref().body.as_ref(), ctx, captures);
+                }
             }
             Statement::If {
                 cond,
@@ -1656,11 +1675,21 @@ impl<'ctx> Compiler<'ctx> {
     }
 
     fn cast_argument_for_call(
-        &self,
+        &mut self,
         value: BasicValueEnum<'ctx>,
         from_ty: OtterType,
         param_type: &BasicTypeEnum<'ctx>,
     ) -> Result<BasicValueEnum<'ctx>> {
+        if matches!(param_type, BasicTypeEnum::PointerType(ptr_ty) if *ptr_ty == self.string_ptr_type)
+            && from_ty != OtterType::Str
+        {
+            let converted = self.ensure_string_value(EvaluatedValue {
+                ty: from_ty,
+                value: Some(value),
+            })?;
+            return Ok(converted);
+        }
+
         if from_ty == OtterType::F64 && param_type.is_int_type() {
             let float_val = value.into_float_value();
             Ok(self
@@ -2683,12 +2712,30 @@ impl<'ctx> Compiler<'ctx> {
 
     fn find_identifier_type_in_statement(&self, stmt: &Statement, var: &str) -> Option<OtterType> {
         match stmt {
-            Statement::Expr(expr)
-            | Statement::Return(Some(expr))
-            | Statement::Let { expr, .. }
-            | Statement::Assignment { expr, .. } => {
+            Statement::Expr(expr) | Statement::Return(Some(expr)) | Statement::Let { expr, .. } => {
                 self.find_identifier_type_in_expr(expr.as_ref(), var)
             }
+            Statement::Assignment { target, expr } => self
+                .find_identifier_type_in_expr(target.as_ref(), var)
+                .or_else(|| self.find_identifier_type_in_expr(expr.as_ref(), var)),
+            Statement::Trait { methods, .. } => methods.iter().find_map(|method| match method {
+                TraitMethod::DefaultImplementation(func) => self
+                    .find_identifier_type_in_block(func.as_ref().body.as_ref(), var),
+                TraitMethod::Signature(_) => None,
+            }),
+            Statement::Impl { methods, .. } => methods
+                .iter()
+                .find_map(|method| self.find_identifier_type_in_block(method.as_ref().body.as_ref(), var)),
+            Statement::Return(None)
+            | Statement::Break
+            | Statement::Continue
+            | Statement::Pass
+            | Statement::Struct { .. }
+            | Statement::Enum { .. }
+            | Statement::TypeAlias { .. }
+            | Statement::Use { .. }
+            | Statement::PubUse { .. }
+            | Statement::Function(_) => None,
             Statement::If {
                 cond,
                 then_block,

@@ -247,7 +247,7 @@ pub enum Statement {
         public: bool,
     },
     Assignment {
-        name: Node<String>,
+        target: Node<Expr>,
         expr: Node<Expr>,
     },
 
