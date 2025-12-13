@@ -211,10 +211,10 @@ impl Formatter {
                 generics,
             } => {
                 let pub_str = if *public { "pub " } else { "" };
-                let gen_str = if generics.is_empty() {
-                    String::new()
-                } else {
+                let gen_str = if let Some(generics) = generics {
                     format!("<{}>", generics.join(", "))
+                } else {
+                    String::new()
                 };
                 let mut result = format!(
                     "{}{}trait {}{}:\n",
@@ -261,31 +261,58 @@ impl Formatter {
             }
             Statement::Impl {
                 trait_name,
+                trait_generics,
+                type_generics,
                 type_name,
                 methods,
-                generics,
-            } => {
-                let gen_str = if generics.is_empty() {
-                    String::new()
-                } else {
-                    format!("<{}>", generics.join(", "))
-                };
-                let mut result = if let Some(trait_name) = trait_name {
-                    format!(
-                        "{}impl {} for {}{}:\n",
+            } => match trait_name {
+                Some(trait_name) => {
+                    let gen_str = if let Some(trait_generics) = trait_generics {
+                        format!("<{}>", trait_generics.join(", "))
+                    } else {
+                        String::new()
+                    };
+                    let type_gen_str = if let Some(type_generics) = type_generics {
+                        format!("<{}>", type_generics.join(", "))
+                    } else {
+                        String::new()
+                    };
+                    let mut result = format!(
+                        "{}impl {}{} for {}{}:\n",
                         self.indent(indent),
                         trait_name,
+                        gen_str,
                         type_name,
-                        gen_str
-                    )
-                } else {
-                    format!("{}impl {}{}:\n", self.indent(indent), type_name, gen_str)
-                };
-                for method in methods {
-                    result.push_str(&self.format_function(method, indent + 1));
+                        type_gen_str
+                    );
+                    for method in methods {
+                        result.push_str(&self.format_function(method, indent + 1));
+                    }
+                    result
                 }
-                result
-            }
+                None => {
+                    let gen_str = if let Some(type_generics) = type_generics {
+                        format!("<{}>", type_generics.join(", "))
+                    } else {
+                        String::new()
+                    };
+                    let mut result = if let Some(trait_name) = trait_name {
+                        format!(
+                            "{}impl {} for {}{}:\n",
+                            self.indent(indent),
+                            trait_name,
+                            type_name,
+                            gen_str
+                        )
+                    } else {
+                        format!("{}impl {}{}:\n", self.indent(indent), type_name, gen_str)
+                    };
+                    for method in methods {
+                        result.push_str(&self.format_function(method, indent + 1));
+                    }
+                    result
+                }
+            },
             Statement::Use { imports } => {
                 let modules: Vec<String> = imports
                     .iter()

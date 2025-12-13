@@ -8,7 +8,6 @@ use otterc_ast::nodes::{
 };
 use otterc_lexer::token::{Token, TokenKind};
 use otterc_span::Span;
-use std::fmt::Error;
 use std::ops::Range;
 
 pub fn parse(tokens: &[Token]) -> Result<Program, Vec<ParserError>> {
@@ -1353,32 +1352,37 @@ fn type_alias_parser() -> impl Parser<TokenKind, Node<Statement>, Error = Simple
 
 fn trait_parser() -> impl Parser<TokenKind, Node<Statement>, Error = Simple<TokenKind>> {
     let newline = just(TokenKind::Newline).repeated().at_least(1);
+
+    let signature_method = function_signature_parser()
+        .then_ignore(newline.clone())
+        .map(TraitMethod::Signature)
+        .boxed();
+
+    let default_impl_method = function_signature_parser()
+        .then(
+            just(TokenKind::Colon)
+                .ignore_then(newline.clone())
+                .ignore_then(block_parser())
+                .boxed(),
+        )
+        .map(|(signature, body)| {
+            let span = *signature.span();
+            TraitMethod::DefaultImplementation(Node::new(Function::new(signature, body), span))
+        })
+        .boxed();
+
+    let method = choice((signature_method, default_impl_method))
+        .delimited_by(just(TokenKind::Indent), just(TokenKind::Dedent))
+        .boxed();
+
     just(TokenKind::Pub)
         .or_not()
         .then_ignore(just(TokenKind::Trait))
         .then(identifier_parser())
-        .then(generics_parser())
+        .then(generics_parser().or_not())
         .then_ignore(just(TokenKind::Colon))
         .then_ignore(newline.clone())
-        .then(
-            function_signature_parser()
-                .then(
-                    just(TokenKind::Colon)
-                        .ignore_then(newline.clone())
-                        .ignore_then(block_parser())
-                        .or_not(),
-                )
-                .map_with_span(|(signature, body), span| match body {
-                    None => TraitMethod::Signature(signature),
-                    Some(body) => TraitMethod::DefaultImplementation(Node::new(
-                        Function::new(signature, body),
-                        span,
-                    )),
-                })
-                .repeated()
-                .at_least(1),
-        )
-        .delimited_by(just(TokenKind::Indent), just(TokenKind::Dedent))
+        .then(method.repeated().at_least(1))
         .map_with_span(|(((pub_kw, name), generics), methods), span| {
             Node::new(
                 Statement::Trait {
@@ -1389,6 +1393,54 @@ fn trait_parser() -> impl Parser<TokenKind, Node<Statement>, Error = Simple<Toke
                 },
                 span,
             )
+        })
+        .boxed()
+}
+
+fn impl_parser() -> impl Parser<TokenKind, Node<Statement>, Error = Simple<TokenKind>> {
+    let newline = just(TokenKind::Newline).repeated().at_least(1);
+
+    let ty = identifier_parser().then(generics_parser().or_not()).boxed();
+
+    let method = function_signature_parser()
+        .then_ignore(just(TokenKind::Colon))
+        .then_ignore(newline.clone())
+        .then(block_parser())
+        .map_with_span(|(signature, body), span| Node::new(Function::new(signature, body), span))
+        .boxed();
+
+    just(TokenKind::Impl)
+        .ignore_then(ty.clone())
+        .then(just(TokenKind::For).ignore_then(ty).or_not())
+        .then_ignore(just(TokenKind::Colon))
+        .then_ignore(newline.clone())
+        .then(
+            method
+                .repeated()
+                .at_least(1)
+                .delimited_by(just(TokenKind::Indent), just(TokenKind::Dedent)),
+        )
+        .map_with_span(|((left, right), methods), span| match right {
+            Some(right) => Node::new(
+                Statement::Impl {
+                    trait_name: Some(left.0),
+                    trait_generics: left.1,
+                    type_name: right.0,
+                    type_generics: right.1,
+                    methods,
+                },
+                span,
+            ),
+            None => Node::new(
+                Statement::Impl {
+                    trait_name: None,
+                    trait_generics: None,
+                    type_name: left.0,
+                    type_generics: left.1,
+                    methods,
+                },
+                span,
+            ),
         })
         .boxed()
 }
@@ -1405,6 +1457,7 @@ fn program_parser() -> impl Parser<TokenKind, Program, Error = Simple<TokenKind>
                 enum_parser(),
                 type_alias_parser(),
                 trait_parser(),
+                impl_parser(),
                 function_parser(),
                 statement_parser(),
             ))
@@ -1472,11 +1525,21 @@ mod tests {
 
     #[test]
     fn parses_trait() {
-        let source = r#"
-trait Display:
-    fn display() -> str
-"#;
+        let source = r#"pub trait Display:
+    fn display() -> str"#;
         let tokens = otterc_lexer::tokenize(source).expect("should tokenize trait");
-        parse(&tokens).expect("should parse trait");
+        let eof_span = tokens
+            .last()
+            .map(|token| token.span())
+            .unwrap_or_else(|| Span::new(0, 0));
+
+        let end = eof_span.end();
+        let stream = Stream::from_iter(
+            end..end + 1,
+            tokens
+                .iter()
+                .map(|token| (token.kind().clone(), token.span().into())),
+        );
+        trait_parser().parse(stream).expect("should parse trait");
     }
 }
