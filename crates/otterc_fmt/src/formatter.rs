@@ -245,7 +245,7 @@ impl Formatter {
                             result.push_str(&format!(
                                 "{}    fn {}({}){}\n",
                                 self.indent(indent),
-                                name,
+                                signature.as_ref().name,
                                 params_str,
                                 ret_str
                             ));
@@ -294,17 +294,12 @@ impl Formatter {
                     } else {
                         String::new()
                     };
-                    let mut result = if let Some(trait_name) = trait_name {
-                        format!(
-                            "{}impl {} for {}{}:\n",
-                            self.indent(indent),
-                            trait_name,
-                            type_name,
-                            gen_str
-                        )
-                    } else {
-                        format!("{}impl {}{}:\n", self.indent(indent), type_name, gen_str)
-                    };
+                    let mut result = format!(
+                        "{}impl {}{}:\n",
+                        self.indent(indent),
+                        type_name,
+                        gen_str
+                    );
                     for method in methods {
                         result.push_str(&self.format_function(method, indent + 1));
                     }

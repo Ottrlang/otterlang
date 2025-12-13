@@ -1379,10 +1379,6 @@ fn trait_parser() -> impl Parser<TokenKind, Node<Statement>, Error = Simple<Toke
         })
         .boxed();
 
-    let method = choice((signature_method, default_impl_method))
-        .delimited_by(just(TokenKind::Indent), just(TokenKind::Dedent))
-        .boxed();
-
     just(TokenKind::Pub)
         .or_not()
         .then_ignore(just(TokenKind::Trait))
@@ -1390,7 +1386,12 @@ fn trait_parser() -> impl Parser<TokenKind, Node<Statement>, Error = Simple<Toke
         .then(generics_parser().or_not())
         .then_ignore(just(TokenKind::Colon))
         .then_ignore(newline.clone())
-        .then(method.repeated().at_least(1))
+        .then(
+            choice((signature_method, default_impl_method))
+                .repeated()
+                .at_least(1)
+                .delimited_by(just(TokenKind::Indent), just(TokenKind::Dedent)),
+        )
         .map_with_span(|(((pub_kw, name), generics), methods), span| {
             Node::new(
                 Statement::Trait {

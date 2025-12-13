@@ -289,7 +289,7 @@ impl TypeChecker {
         Ok(())
     }
 
-    #[expect(dead_code, reason = "trait method checking is still gated behind proposal")] 
+    #[expect(dead_code, reason = "trait method support not wired yet")]
     fn check_struct_methods(
         &mut self,
         struct_name: &str,
@@ -310,7 +310,7 @@ impl TypeChecker {
         Ok(())
     }
 
-    #[expect(dead_code, reason = "trait metadata tracking is only used by traits feature")] 
+    #[expect(dead_code, reason = "trait metadata tracking only used by traits feature")]
     fn record_method_metadata(&mut self, method_name: &str, body: &Block) {
         let mut spans = Vec::new();
         let mut expr_ids = Vec::new();
@@ -329,7 +329,7 @@ impl TypeChecker {
         }
     }
 
-    #[expect(dead_code, reason = "trait metadata tracking is only used by traits feature")] 
+    #[expect(dead_code, reason = "trait metadata tracking only used by traits feature")]
     fn collect_metadata_in_block(
         &self,
         block: &Block,
@@ -341,7 +341,7 @@ impl TypeChecker {
         }
     }
 
-    #[expect(dead_code, reason = "trait metadata tracking is only used by traits feature")] 
+    #[expect(dead_code, reason = "trait metadata tracking only used by traits feature")]
     fn collect_metadata_in_statement(
         &self,
         stmt: &Statement,
@@ -388,7 +388,7 @@ impl TypeChecker {
         }
     }
 
-    #[expect(dead_code, reason = "trait metadata tracking is only used by traits feature")] 
+    #[expect(dead_code, reason = "trait metadata tracking only used by traits feature")]
     fn collect_metadata_in_expr(
         &self,
         expr: &Node<Expr>,
@@ -541,7 +541,7 @@ impl TypeChecker {
         }
     }
 
-    #[expect(dead_code, reason = "trait method lowering is not yet wired up")] 
+    #[expect(dead_code, reason = "trait method lowering not wired yet")]
     fn rewrite_method_self_param(&self, method_func: &mut Function, struct_name: &str) {
         let Some(first_param) = method_func.signature.as_mut().params.first_mut() else {
             return;
