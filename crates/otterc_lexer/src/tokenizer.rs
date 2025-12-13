@@ -887,4 +887,12 @@ mod tests {
 
         assert_eq!(newline_span, 2);
     }
+
+    #[test]
+    fn test_example_traits() {
+        let tokens = tokenize(include_str!("../../../examples/basic/traits_basic.ot"))
+            .expect("lexing should succeed");
+        assert!(!tokens.is_empty());
+        assert_eq!(tokens.first().unwrap().kind(), &TokenKind::Trait);
+    }
 }
