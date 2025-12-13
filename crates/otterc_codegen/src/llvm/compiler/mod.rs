@@ -78,11 +78,12 @@ impl<'ctx> Compiler<'ctx> {
                 self.record_expr_spans(target);
                 self.record_expr_spans(expr);
             }
-            Statement::Impl { methods, .. } | Statement::Struct { methods, .. } => {
+            Statement::Impl { methods, .. } => {
                 for method in methods {
                     self.record_function_spans(method.as_ref());
                 }
             }
+            Statement::Struct { .. } => {}
             Statement::Trait { methods, .. } => {
                 for method in methods {
                     if let TraitMethod::DefaultImplementation(func) = method {

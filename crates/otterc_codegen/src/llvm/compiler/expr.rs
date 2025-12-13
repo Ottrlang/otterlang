@@ -357,7 +357,16 @@ impl<'ctx> Compiler<'ctx> {
             Statement::Block(block) => {
                 self.collect_captured_names_in_block(block.as_ref(), ctx, captures);
             }
-            _ => {}
+            Statement::Return(None)
+            | Statement::Break
+            | Statement::Continue
+            | Statement::Pass
+            | Statement::Use { .. }
+            | Statement::PubUse { .. }
+            | Statement::Struct { .. }
+            | Statement::Enum { .. }
+            | Statement::TypeAlias { .. }
+            | Statement::Function(_) => {}
         }
     }
 
@@ -1635,9 +1644,6 @@ impl<'ctx> Compiler<'ctx> {
 
                     // Cast pointer to target type
                     let target_ptr_ty = self.context.ptr_type(inkwell::AddressSpace::default());
-                    // In opaque pointer world (LLVM 15+), pointer casts are no-ops or just type changes
-                    // But we might need to be explicit if using typed pointers or for clarity
-                    // Actually, build_bit_cast on pointer works
                     let cast_ptr = self
                         .builder
                         .build_bit_cast(alloca, target_ptr_ty, "coercion_cast")?
@@ -1680,14 +1686,14 @@ impl<'ctx> Compiler<'ctx> {
         from_ty: OtterType,
         param_type: &BasicTypeEnum<'ctx>,
     ) -> Result<BasicValueEnum<'ctx>> {
-        if matches!(param_type, BasicTypeEnum::PointerType(ptr_ty) if *ptr_ty == self.string_ptr_type)
-            && from_ty != OtterType::Str
-        {
-            let converted = self.ensure_string_value(EvaluatedValue {
-                ty: from_ty,
-                value: Some(value),
-            })?;
-            return Ok(converted);
+        if let BasicTypeEnum::PointerType(ptr_ty) = param_type {
+            if *ptr_ty == self.string_ptr_type && from_ty != OtterType::Str {
+                let converted = self.ensure_string_value(EvaluatedValue {
+                    ty: from_ty,
+                    value: Some(value),
+                })?;
+                return Ok(converted);
+            }
         }
 
         if from_ty == OtterType::F64 && param_type.is_int_type() {
@@ -2762,7 +2768,6 @@ impl<'ctx> Compiler<'ctx> {
                 .find_identifier_type_in_expr(iterable.as_ref(), var)
                 .or_else(|| self.find_identifier_type_in_block(body.as_ref(), var)),
             Statement::Block(block) => self.find_identifier_type_in_block(block.as_ref(), var),
-            _ => None,
         }
     }
 
