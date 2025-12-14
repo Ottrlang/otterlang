@@ -11,5 +11,5 @@ pub mod tiered_compiler;
 
 pub use concurrency::ConcurrencyManager;
 pub use engine::JitEngine;
-pub use executor::JitExecutor;
+pub use executor::{ExecutorStats, JitExecutor};
 pub use layout::DataLayoutOptimizer;

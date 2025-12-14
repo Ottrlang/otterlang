@@ -68,13 +68,8 @@ impl JitExecutor {
     }
 
     /// Trigger optimization for a hot function
-    fn optimize_function(&mut self, _name: &str) -> Result<()> {
-        // In a real JIT, this would trigger re-compilation with higher optimization levels (O3)
-        // For now, we just log it or simulate it
-        // println!("Optimizing hot function: {}", name);
-
-        // Example: self.engine.recompile(name, OptLevel::Aggressive)?;
-        Ok(())
+    fn optimize_function(&mut self, name: &str) -> Result<()> {
+        self.engine.optimize_functions(&[name.to_string()])
     }
 
     /// Get performance statistics

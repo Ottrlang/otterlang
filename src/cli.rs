@@ -20,6 +20,7 @@ use otterc_cache::{CacheBuildOptions, CacheEntry, CacheManager, CacheMetadata, C
 use otterc_codegen::{BuildArtifact, build_executable};
 use otterc_config::{CodegenOptLevel, CodegenOptions, LanguageFeatureFlags, TargetTriple, VERSION};
 use otterc_ffi::{BridgeSymbolRegistry, FunctionSpec, TypeSpec};
+use otterc_jit::{ExecutorStats, JitExecutor};
 use otterc_lexer::{LexerError, tokenize};
 use otterc_module::ModuleProcessor;
 use otterc_parser::{ParserError, parse};
@@ -69,6 +70,10 @@ pub struct OtterCli {
     #[arg(long, global = true)]
     /// Trace task lifecycle events from the runtime.
     tasks_trace: bool,
+
+    #[arg(long, global = true)]
+    /// Execute programs via the experimental JIT instead of spawning a separate binary.
+    jit: bool,
 
     #[arg(long, global = true)]
     /// Enable debug mode with stack traces.
@@ -162,6 +167,10 @@ pub fn run() -> Result<()> {
     otterc_ffi::bootstrap_stdlib();
     let cli = OtterCli::parse();
     enforce_task_runtime_flags(&cli)?;
+
+    if cli.jit && !matches!(cli.command, Command::Run { .. }) {
+        bail!("--jit is currently only supported with the `run` command");
+    }
 
     match &cli.command {
         Command::Run { path } => handle_run(&cli, path),
@@ -268,32 +277,50 @@ fn handle_run(cli: &OtterCli, path: &Path) -> Result<()> {
     let source = read_source(path)?;
     let stage = compile_pipeline(path, &source, &settings)?;
 
-    match &stage.result {
-        CompilationResult::CacheHit(entry) => {
-            println!(
-                "{} ({} bytes)",
-                "Cache hit".cyan().bold(),
-                entry.metadata.binary_size
-            );
-            if settings.profile {
-                print_profile(&entry.metadata);
+    if settings.jit_enabled() {
+        match &stage.result {
+            CompilationResult::PreparedProgram { program } => {
+                run_program_with_jit(program, &settings)?;
             }
-            execute_binary(&entry.binary_path, &settings)?;
-        }
-        CompilationResult::Compiled { artifact, metadata } => {
-            println!("{} {}", "Building".blue().bold(), artifact.binary.display());
-            execute_binary(&artifact.binary, &settings)?;
-            if settings.dump_ir
-                && let Some(ir) = &artifact.ir
-            {
-                println!("\n{}", "== LLVM IR ==".bold());
-                println!("{ir}");
-            }
-            if settings.profile {
-                print_profile(metadata);
+            _ => {
+                bail!(
+                    "unexpected compilation result for JIT execution; was the --jit flag removed?"
+                );
             }
         }
-        CompilationResult::Checked => unreachable!("check_only should be false for run command"),
+    } else {
+        match &stage.result {
+            CompilationResult::CacheHit(entry) => {
+                println!(
+                    "{} ({} bytes)",
+                    "Cache hit".cyan().bold(),
+                    entry.metadata.binary_size
+                );
+                if settings.profile {
+                    print_profile(&entry.metadata);
+                }
+                execute_binary(&entry.binary_path, &settings)?;
+            }
+            CompilationResult::Compiled { artifact, metadata } => {
+                println!("{} {}", "Building".blue().bold(), artifact.binary.display());
+                execute_binary(&artifact.binary, &settings)?;
+                if settings.dump_ir
+                    && let Some(ir) = &artifact.ir
+                {
+                    println!("\n{}", "== LLVM IR ==".bold());
+                    println!("{ir}");
+                }
+                if settings.profile {
+                    print_profile(metadata);
+                }
+            }
+            CompilationResult::Checked => {
+                unreachable!("check_only should be false for run command")
+            }
+            CompilationResult::PreparedProgram { .. } => {
+                unreachable!("prepared program should only be returned when --jit is enabled")
+            }
+        }
     }
 
     if settings.time {
@@ -318,6 +345,9 @@ fn handle_build(cli: &OtterCli, path: &Path, output: Option<PathBuf>) -> Result<
         CompilationResult::CacheHit(entry) => &entry.binary_path,
         CompilationResult::Compiled { artifact, .. } => &artifact.binary,
         CompilationResult::Checked => unreachable!("check_only should be false for build command"),
+        CompilationResult::PreparedProgram { .. } => {
+            unreachable!("--jit is not supported for the build command")
+        }
     };
 
     fs::copy(cached_binary, &output_path).with_context(|| {
@@ -348,6 +378,9 @@ fn handle_build(cli: &OtterCli, path: &Path, output: Option<PathBuf>) -> Result<
             }
         }
         CompilationResult::Checked => unreachable!("check_only should be false for build command"),
+        CompilationResult::PreparedProgram { .. } => {
+            unreachable!("--jit is not supported for the build command")
+        }
     }
 
     if settings.time {
@@ -484,6 +517,14 @@ pub fn compile_pipeline(
         });
     }
 
+    if settings.jit_enabled() {
+        profiler.push_phase("Codegen skipped (JIT)", Duration::from_millis(0));
+        return Ok(CompilationStage {
+            profiler,
+            result: CompilationResult::PreparedProgram { program },
+        });
+    }
+
     let enum_layouts = type_checker.enum_layouts();
     let (expr_types, expr_types_by_span, comprehension_var_types) = type_checker.into_type_maps();
 
@@ -584,6 +625,9 @@ pub enum CompilationResult {
         artifact: BuildArtifact,
         metadata: CacheMetadata,
     },
+    PreparedProgram {
+        program: otterc_ast::nodes::Program,
+    },
 }
 
 impl CompilationStage {
@@ -603,6 +647,7 @@ pub struct CompilationSettings {
     tasks: bool,
     tasks_debug: bool,
     tasks_trace: bool,
+    jit: bool,
     debug: bool,
     target: Option<String>,
     no_cache: bool,
@@ -639,12 +684,6 @@ impl GcCliOptions {
             interval_ms: cli.gc_interval_ms,
             disabled_limit: cli.gc_disabled_max_bytes,
         })
-    }
-
-    fn apply_to_command(&self, command: &mut std::process::Command) {
-        for (key, value) in self.env_pairs() {
-            command.env(key, value);
-        }
     }
 
     fn env_pairs(&self) -> Vec<(&'static str, String)> {
@@ -691,6 +730,7 @@ impl CompilationSettings {
             tasks: cli.tasks,
             tasks_debug: cli.tasks_debug,
             tasks_trace: cli.tasks_trace,
+            jit: cli.jit,
             debug: cli.debug,
             target: cli.target.clone(),
             no_cache: cli.no_cache,
@@ -704,24 +744,43 @@ impl CompilationSettings {
     }
 
     fn allow_cache(&self) -> bool {
-        !(self.dump_tokens || self.dump_ast || self.dump_ir || self.no_cache || self.check_only)
+        !(self.dump_tokens
+            || self.dump_ast
+            || self.dump_ir
+            || self.no_cache
+            || self.check_only
+            || self.jit)
+    }
+
+    pub fn jit_enabled(&self) -> bool {
+        self.jit
     }
 
     pub fn apply_runtime_env(&self, command: &mut std::process::Command) {
+        for (key, value) in self.runtime_env_pairs() {
+            command.env(key, value);
+        }
+    }
+
+    fn runtime_env_pairs(&self) -> Vec<(String, String)> {
+        let mut pairs = Vec::new();
         if self.tasks {
-            command.env("OTTER_TASKS_DIAGNOSTICS", "1");
+            pairs.push(("OTTER_TASKS_DIAGNOSTICS".into(), "1".into()));
         }
         if self.tasks_debug {
-            command.env("OTTER_TASKS_DEBUG", "1");
+            pairs.push(("OTTER_TASKS_DEBUG".into(), "1".into()));
         }
         if self.tasks_trace {
-            command.env("OTTER_TASKS_TRACE", "1");
+            pairs.push(("OTTER_TASKS_TRACE".into(), "1".into()));
         }
         if self.debug {
-            command.env("RUST_BACKTRACE", "1");
-            command.env("OTTER_DEBUG", "1");
+            pairs.push(("RUST_BACKTRACE".into(), "1".into()));
+            pairs.push(("OTTER_DEBUG".into(), "1".into()));
         }
-        self.gc.apply_to_command(command);
+        for (key, value) in self.gc.env_pairs() {
+            pairs.push((key.to_string(), value));
+        }
+        pairs
     }
 
     fn cache_build_options(&self) -> CacheBuildOptions {
@@ -892,6 +951,60 @@ fn execute_binary(path: &Path, settings: &CompilationSettings) -> Result<()> {
     Ok(())
 }
 
+fn run_program_with_jit(
+    program: &otterc_ast::nodes::Program,
+    settings: &CompilationSettings,
+) -> Result<()> {
+    let _env_guard = RuntimeEnvGuard::apply(settings);
+    let registry = SymbolRegistry::global();
+    let mut executor = JitExecutor::new(program, registry)?;
+    executor.execute_main()?;
+
+    if settings.profile {
+        let stats = executor.get_stats();
+        print_jit_stats(&stats);
+    }
+
+    Ok(())
+}
+
+struct RuntimeEnvGuard {
+    previous: Vec<(String, Option<String>)>,
+}
+
+impl RuntimeEnvGuard {
+    fn apply(settings: &CompilationSettings) -> Self {
+        let mut previous = Vec::new();
+        for (key, value) in settings.runtime_env_pairs() {
+            let prior = std::env::var(&key).ok();
+            // SAFETY: setting process environment variables is the intended side effect here.
+            unsafe {
+                std::env::set_var(&key, &value);
+            }
+            previous.push((key, prior));
+        }
+        Self { previous }
+    }
+}
+
+impl Drop for RuntimeEnvGuard {
+    fn drop(&mut self) {
+        for (key, value) in self.previous.drain(..).rev() {
+            if let Some(v) = value {
+                // SAFETY: restoring the previous variable mirrors the earlier mutation.
+                unsafe {
+                    std::env::set_var(&key, v);
+                }
+            } else {
+                // SAFETY: removing the variable reverts the temporary override above.
+                unsafe {
+                    std::env::remove_var(&key);
+                }
+            }
+        }
+    }
+}
+
 fn print_timings(stage: &CompilationStage) {
     println!("\nTimings:");
     let mut total = Duration::ZERO;
@@ -989,6 +1102,27 @@ fn print_profile(metadata: &CacheMetadata) {
     if let Some(version) = &metadata.llvm_version {
         println!("  LLVM:   {}", version);
     }
+}
+
+fn print_jit_stats(stats: &ExecutorStats) {
+    println!("\nJIT profile:");
+    if stats.profiler_metrics.is_empty() {
+        println!("  No functions executed yet");
+    } else {
+        for metric in &stats.profiler_metrics {
+            println!(
+                "  {:20} calls: {:6} avg: {:>8.3}µs total: {:>8.3}ms",
+                metric.name,
+                metric.call_count,
+                metric.avg_time.as_secs_f64() * 1_000_000.0,
+                metric.total_time.as_secs_f64() * 1000.0
+            );
+        }
+    }
+    println!(
+        "  Cache: {} function(s), {} bytes",
+        stats.cache_stats.total_functions, stats.cache_stats.total_size
+    );
 }
 
 fn emit_lexer_errors(source_id: &str, source: &str, errors: &[LexerError]) {

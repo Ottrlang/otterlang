@@ -307,16 +307,12 @@ impl JitEngine {
         Ok(result)
     }
 
-    /// Optimize hot functions by recompiling with aggressive optimizations
-    fn optimize_hot_functions(&mut self, hot_functions: &[HotFunction]) -> Result<()> {
-        // Get the program
-        let program = self
-            .program
-            .as_ref()
-            .ok_or_else(|| anyhow!("No program loaded"))?;
+    /// Force optimization of the provided functions by recompiling the module
+    pub fn optimize_functions(&mut self, function_names: &[String]) -> Result<()> {
+        if function_names.is_empty() {
+            return Ok(());
+        }
 
-        // Recompile with aggressive optimizations
-        let lib_path = self.temp_dir.path().join("jit_program_optimized");
         let options = CodegenOptions {
             target: None,
             emit_ir: false,
@@ -327,63 +323,14 @@ impl JitEngine {
             inline_threshold: None,
         };
 
-        let mut type_checker = TypeChecker::new().with_registry(SymbolRegistry::global());
-        type_checker
-            .check_program(program)
-            .context("Type checking failed during optimized JIT compilation")?;
-        let enum_layouts = type_checker.enum_layouts();
-        let (expr_types, expr_types_by_span, comprehension_var_types) =
-            type_checker.into_type_maps();
+        let library = self.rebuild_library("jit_program_optimized", &options)?;
+        self.reload_named_functions(&library, function_names)
+    }
 
-        let artifact = build_shared_library(
-            program,
-            &expr_types,
-            &expr_types_by_span,
-            &comprehension_var_types,
-            &enum_layouts,
-            &lib_path,
-            &options,
-        )
-        .context("Failed to recompile with optimizations")?;
-
-        let lib_path = artifact.binary;
-
-        // Load optimized library
-        let library = Arc::new(unsafe {
-            Library::new(&lib_path)
-                .map_err(|e| anyhow!("Failed to load optimized library: {}", e))?
-        });
-
-        // Update library reference
-        *self.compiled_library.lock().unwrap() = Some(library.clone());
-
-        // Reload hot functions
-        for hot_func in hot_functions {
-            if let Some(func) = program
-                .statements
-                .iter()
-                .find_map(|stmt| match stmt.as_ref() {
-                    Statement::Function(f) if f.as_ref().name == hot_func.name => Some(f),
-                    _ => None,
-                })
-            {
-                let arg_count = func.as_ref().params.len();
-                if let Ok(func_ptr) = self.load_function_symbol(&library, &hot_func.name, arg_count)
-                {
-                    let mut functions = self.compiled_functions.lock().unwrap();
-                    functions.insert(
-                        hot_func.name.clone(),
-                        CompiledFunction {
-                            library: library.clone(),
-                            function_ptr: func_ptr,
-                            arg_count,
-                        },
-                    );
-                }
-            }
-        }
-
-        Ok(())
+    /// Optimize hot functions by recompiling with aggressive optimizations
+    fn optimize_hot_functions(&mut self, hot_functions: &[HotFunction]) -> Result<()> {
+        let function_names: Vec<String> = hot_functions.iter().map(|f| f.name.clone()).collect();
+        self.optimize_functions(&function_names)
     }
 
     /// Get profiler statistics
@@ -400,6 +347,86 @@ impl JitEngine {
     pub fn get_function_names(&self) -> Vec<String> {
         let functions = self.compiled_functions.lock().unwrap();
         functions.keys().cloned().collect()
+    }
+}
+
+impl JitEngine {
+    fn rebuild_library(
+        &mut self,
+        file_stem: &str,
+        options: &CodegenOptions,
+    ) -> Result<Arc<Library>> {
+        let program = self
+            .program
+            .as_ref()
+            .ok_or_else(|| anyhow!("No program loaded"))?;
+        let lib_path = self.temp_dir.path().join(file_stem);
+
+        let mut type_checker = TypeChecker::new().with_registry(SymbolRegistry::global());
+        type_checker
+            .check_program(program)
+            .context("Type checking failed during optimized JIT compilation")?;
+        let enum_layouts = type_checker.enum_layouts();
+        let (expr_types, expr_types_by_span, comprehension_var_types) =
+            type_checker.into_type_maps();
+
+        let artifact = build_shared_library(
+            program,
+            &expr_types,
+            &expr_types_by_span,
+            &comprehension_var_types,
+            &enum_layouts,
+            &lib_path,
+            options,
+        )
+        .context("Failed to compile program to shared library")?;
+
+        let lib_path = artifact.binary;
+
+        let library = Arc::new(unsafe {
+            Library::new(&lib_path)
+                .map_err(|e| anyhow!("Failed to load optimized library: {}", e))?
+        });
+
+        *self.compiled_library.lock().unwrap() = Some(library.clone());
+        *self.library_path.lock().unwrap() = Some(lib_path);
+
+        Ok(library)
+    }
+
+    fn reload_named_functions(
+        &self,
+        library: &Arc<Library>,
+        function_names: &[String],
+    ) -> Result<()> {
+        let program = self
+            .program
+            .as_ref()
+            .ok_or_else(|| anyhow!("No program loaded"))?;
+
+        let mut functions = self.compiled_functions.lock().unwrap();
+        for name in function_names {
+            let func = program
+                .statements
+                .iter()
+                .find_map(|stmt| match stmt.as_ref() {
+                    Statement::Function(f) if f.as_ref().name == *name => Some(f),
+                    _ => None,
+                })
+                .ok_or_else(|| anyhow!("Function '{}' not found in program", name))?;
+            let arg_count = func.as_ref().params.len();
+            let func_ptr = self.load_function_symbol(library, name, arg_count)?;
+            functions.insert(
+                name.clone(),
+                CompiledFunction {
+                    library: library.clone(),
+                    function_ptr: func_ptr,
+                    arg_count,
+                },
+            );
+        }
+
+        Ok(())
     }
 }
 

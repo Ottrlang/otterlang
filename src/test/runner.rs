@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use std::path::Path;
 use std::process::Command;
 use std::time::Instant;
@@ -93,6 +93,9 @@ impl TestRunner {
             crate::cli::CompilationResult::Compiled { artifact, .. } => artifact.binary.clone(),
             crate::cli::CompilationResult::Checked => {
                 unreachable!("check_only should be false for tests")
+            }
+            crate::cli::CompilationResult::PreparedProgram { .. } => {
+                bail!("tests do not support JIT-only compilation")
             }
         };
 
