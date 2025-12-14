@@ -122,7 +122,20 @@ jobs:
           }
 
           Write-Host "Cloning vcpkg..."
-          git clone https://github.com/microsoft/vcpkg $vcpkgRoot | Out-Null
+          $maxCloneAttempts = 5
+          for ($attempt = 1; $attempt -le $maxCloneAttempts; $attempt++) {
+            try {
+              git clone https://github.com/microsoft/vcpkg $vcpkgRoot | Out-Null
+              break
+            } catch {
+              if ($attempt -eq $maxCloneAttempts) {
+                throw $_
+              }
+              $delay = [Math]::Min(30, 5 * $attempt)
+              Write-Host "git clone failed (attempt $attempt). Retrying in $delay seconds..."
+              Start-Sleep -Seconds $delay
+            }
+          }
 
           Write-Host "Bootstrapping vcpkg..."
           & "$vcpkgRoot\bootstrap-vcpkg.bat" -disableMetrics | Out-Null
