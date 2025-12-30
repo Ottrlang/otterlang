@@ -158,8 +158,8 @@ fn describe_value(value):
 
 ```otter
 fn main():
-    # While loop with mutable variable
-    mut i = 0
+    # While loop with variable
+    let i = 0
     while i < 10:
         println(f"Count: {i}")
         i = i + 1
@@ -253,8 +253,8 @@ struct Person:
 
 fn main():
     # Create struct instances
-    origin = Point{x: 0.0, y: 0.0}
-    point = Point{x: 3.0, y: 4.0}
+    origin = Point(x=0.0, y=0.0)
+    point = Point(x=3.0, y=4.0)
 
     # Access fields
     println(f"Point: ({point.x}, {point.y})")
@@ -264,7 +264,7 @@ fn main():
     println(f"Distance: {distance}")
 
     # Create person
-    person = Person{name: "Alice", age: 30, email: "alice@example.com"}
+    person = Person(name="Alice", age=30, email="alice@example.com")
     println(f"Hello, {person.name}!")
 ```
 
@@ -278,7 +278,7 @@ type Email = string
 type Coordinates = Point
 
 fn create_user(id: UserId, email: Email) -> Person:
-    return Person{name: "Unknown", age: 0, email: email}
+    return Person(name="Unknown", age=0, email=email)
 
 fn calculate_distance(a: Coordinates, b: Coordinates) -> float:
     dx = a.x - b.x
@@ -293,6 +293,8 @@ OtterLang provides built-in support for concurrent programming with tasks and ch
 ### Spawning Tasks
 
 ```otter
+use time
+
 fn fibonacci(n: int) -> int:
     if n <= 1:
         return n
@@ -300,7 +302,7 @@ fn fibonacci(n: int) -> int:
 
 fn compute_heavy_task(id: int) -> string:
     # Simulate heavy computation
-    sleep_ms(100)
+    time.sleep(100)
     result = fibonacci(20 + id)
     return f"Task {id} result: {result}"
 
@@ -340,7 +342,7 @@ fn safe_divide(a: float, b: float) -> Result<float, string>:
 fn find_user(id: int) -> Result<Person, string>:
     # Simulate database lookup
     if id == 1:
-        return Result.Ok(Person{name: "Alice", age: 30, email: "alice@example.com"})
+        return Result.Ok(Person(name="Alice", age=30, email="alice@example.com"))
     return Result.Err("User not found")
 
 fn main():
@@ -368,7 +370,7 @@ use std/core
 
 fn find_user_optional(id: int) -> Option<Person>:
     if id == 1:
-        return Option.Some(Person{name: "Alice", age: 30, email: "alice@example.com"})
+        return Option.Some(Person(name="Alice", age=30, email="alice@example.com"))
     return Option.None
 
 fn main():
@@ -383,30 +385,40 @@ fn main():
 
 ### Generic Functions
 
-OtterLang supports parametric polymorphism through generics:
+**Note:** OtterLang currently does not support generic function parameters (e.g., `fn first<T>(...)`). Generic behavior is achieved through generic structs, enums, and type aliases. Functions can work with generic types by accepting them as parameters:
 
 ```otter
-fn first<T>(items: list<T>) -> T:
+# Generic behavior through type inference
+fn first(items: list<int>) -> int:
     return items[0]
 
-fn map<T, U>(items: list<T>, transform: fn(T) -> U) -> list<U>:
-    return [transform(item) for item in items]
+fn first_string(items: list<string>) -> string:
+    return items[0]
+
+# Or use generic structs to achieve polymorphism
+struct Box<T>:
+    value: T
+
+fn get_value(box: Box<int>) -> int:
+    return box.value
 
 fn main():
     numbers = [1, 2, 3, 4, 5]
     first_num = first(numbers)  # 1
 
     strings = ["a", "b", "c"]
-    first_str = first(strings)  # "a"
-
-    # Transform numbers to strings using anonymous function
-    num_strings = map(numbers, fn (x: int) -> string: str(x))
-    println(f"Number strings: {num_strings}")
+    first_str = first_string(strings)  # "a"
+    
+    boxed = Box(value=42)
+    value = get_value(boxed)
+    println(f"Boxed value: {value}")
 ```
 
 ### Advanced Structs and Enums
 
 ```otter
+use std/core
+
 enum Result<T, E>:
     Ok: (T)
     Err: (E)
@@ -417,19 +429,21 @@ struct Container<T>:
     fn add(self, item: T) -> unit:
         self.items += [item]
 
-    fn get(self, index: int) -> T | nil:
+    fn get(self, index: int) -> Option<T>:
         if index >= 0 and index < len(self.items):
-            return self.items[index]
-        return nil
+            return Option.Some(self.items[index])
+        return Option.None
 
 fn main():
-    container = Container{items: []}
+    container = Container(items=[])
     container.add("hello")
     container.add("world")
 
-    first = container.get(0)
-    if first != nil:
-        println(f"First item: {first}")
+    match container.get(0):
+        case Option.Some(first):
+            println(f"First item: {first}")
+        case Option.None:
+            println("No item at index 0")
 ```
 
 ### Modules and Imports
@@ -460,18 +474,17 @@ fn main():
     println(f"Sum: {sum}, Product: {product}, Factorial: {fact}")
 ```
 
-### Module Aliases and Selective Imports
+### Module Aliases
 
 ```otter
 # Import with alias
 use math_utils as mu
 
-# Selective import
-use math_utils.{add, multiply}
-
 fn main():
     result = mu.add(1.0, 2.0)  # Using alias
     println(f"Result: {result}")
 ```
+
+**Note:** OtterLang currently supports importing entire modules with optional aliases. Selective imports of specific items from a module are not yet supported. Use module aliases to shorten module names when needed.
 
 For more information, see the [Language Specification](LANGUAGE_SPEC.md) and [API Reference](API_REFERENCE.md).
