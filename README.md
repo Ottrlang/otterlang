@@ -23,23 +23,6 @@
   [![Discord](https://img.shields.io/badge/Discord-Join%20Server-5865F2?style=flat&logo=discord&logoColor=white)](https://discord.gg/y3b4QuvyFk)
 </div>
 
-<h1 align="center">What is OtterLang?</h1>
-
-OtterLang is an indentation-sensitive programming language with an LLVM backend that compiles to native machine code. It combines Python-like simplicity with Rust-like performance and seamless (not yet) interoperability with the Rust ecosystem.
-
-**Think of OtterLang as a modern language that bridges the gap between high-level expressiveness and low-level performance, with transparent access to the entire Rust ecosystem.**
-
-<h1 align="center">Goals</h1>
-
-- 🎯 **Simple syntax** – Indentation-driven, no braces or semicolons
-- ⚡ **Native performance** – Compiles to native binaries with LLVM
-- 🔗 **Transparent Rust FFI** – Import any Rust crate with `use rust:crate_name` (very barebones)
-- 🛡️ **Memory safety** – Generational garbage collection with explicit root APIs
-- 🧵 **Concurrency** – Built-in threaded task runtime
-- 📦 **Rich standard library** – Comprehensive stdlib covering IO, networking, JSON, and more
-
-<h1 align="center">Quick Start</h1>
-
 ```bash
 git clone https://github.com/jonathanmagambo/otterlang.git
 cd otterlang
