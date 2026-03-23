@@ -19,19 +19,35 @@ struct CapturedVariable<'ctx> {
 impl<'ctx> Compiler<'ctx> {
     fn eval_await_expr(
         &mut self,
-        expr: &Expr,
+        full_expr: &Expr,
+        inner_expr: &Expr,
         ctx: &mut FunctionContext<'ctx>,
     ) -> Result<EvaluatedValue<'ctx>> {
-        let handle = self.eval_expr(expr, ctx)?;
+        let handle = self.eval_expr(inner_expr, ctx)?;
         let value = handle
             .value
             .ok_or_else(|| anyhow!("await expects a task handle value"))?;
         let join_fn = self.get_or_declare_ffi_function("task.join")?;
-        self.builder
+        let call = self.builder
             .build_call(join_fn, &[value.into()], "task_join")?;
+            
+        let res_val = call.try_as_basic_value().left()
+            .ok_or_else(|| anyhow!("task.join returned nothing"))?;
+
+        let expected_ty = self
+            .expr_type(full_expr)
+            .and_then(|ty| self.typeinfo_to_otter_type(ty))
+            .unwrap_or(OtterType::Opaque);
+
+        let decoded = match expected_ty {
+            OtterType::F64 => Some(self.builder.build_bit_cast(res_val, self.context.f64_type(), "f64_cast")?),
+            OtterType::Bool => Some(self.builder.build_int_truncate(res_val.into_int_value(), self.context.bool_type(), "bool_cast")?.into()),
+            _ => Some(res_val),
+        };
+
         Ok(EvaluatedValue {
-            ty: OtterType::Unit,
-            value: None,
+            ty: expected_ty,
+            value: decoded,
         })
     }
 
@@ -119,7 +135,7 @@ impl<'ctx> Compiler<'ctx> {
         let fn_name = format!("spawn_wrapper_{}", spawn_id);
         let fn_type = self
             .context
-            .void_type()
+            .i64_type()
             .fn_type(&[self.raw_ptr_type().into()], false);
         let function = self.module.add_function(&fn_name, fn_type, None);
         let entry = self.context.append_basic_block(function, "entry");
@@ -164,13 +180,23 @@ impl<'ctx> Compiler<'ctx> {
             }
         }
 
-        let _ = self.eval_expr(expr, &mut wrapper_ctx)?;
+        let evaluated = self.eval_expr(expr, &mut wrapper_ctx)?;
 
         if let Some(ptr) = raw_ptr {
             self.builder.build_free(ptr)?;
         }
 
-        self.builder.build_return(None)?;
+        let ret_val = evaluated.value.unwrap_or_else(|| {
+            self.context.i64_type().const_zero().into()
+        });
+
+        let final_ret = match evaluated.ty {
+            OtterType::F64 => self.builder.build_bit_cast(ret_val, self.context.i64_type(), "i64_cast")?,
+            OtterType::Bool => self.builder.build_int_z_extend(ret_val.into_int_value(), self.context.i64_type(), "bool_cast")?.into(),
+            _ => ret_val,
+        };
+
+        self.builder.build_return(Some(&final_ret))?;
 
         if let Some(block) = prev_block {
             self.builder.position_at_end(block);
@@ -511,6 +537,11 @@ impl<'ctx> Compiler<'ctx> {
                 let expr_type = self.expr_types.get(&expr_id).cloned();
                 self.eval_array_expr(elements, expr_type.as_ref(), ctx)
             }
+            Expr::Dict(elements) => {
+                let expr_id = expr as *const Expr as usize;
+                let expr_type = self.expr_types.get(&expr_id).cloned();
+                self.eval_dict_expr(elements, expr_type.as_ref(), ctx)
+            }
             Expr::ListComprehension {
                 element,
                 var,
@@ -539,7 +570,7 @@ impl<'ctx> Compiler<'ctx> {
                 condition.as_ref().map(|c| c.as_ref().as_ref()),
                 ctx,
             ),
-            Expr::Await(expr) => self.eval_await_expr(expr.as_ref().as_ref(), ctx),
+            Expr::Await(inner) => self.eval_await_expr(expr, inner.as_ref().as_ref(), ctx),
             Expr::Spawn(expr) => self.eval_spawn_expr(expr.as_ref().as_ref(), ctx),
             _ => bail!("Expression type not implemented: {:?}", expr),
         }
@@ -587,14 +618,32 @@ impl<'ctx> Compiler<'ctx> {
                 .context
                 .append_basic_block(function, &format!("match_arm_body_{}", i));
 
+            // The block where the pattern is tested – if a guard exists we jump to guard_bb
+            // on pattern success, otherwise jump directly to body_bb.
+            let after_pattern_bb = if arm.as_ref().guard.is_some() {
+                self.context
+                    .append_basic_block(function, &format!("match_arm_guard_{}", i))
+            } else {
+                body_bb
+            };
+
             self.compile_pattern_match(
                 &arm.as_ref().pattern,
                 &matched_val,
                 matched_type_info.clone(),
-                body_bb,
+                after_pattern_bb,
                 next_check_bb,
                 ctx,
             )?;
+
+            // If there is a guard, emit it now in after_pattern_bb.
+            if let Some(guard_expr) = &arm.as_ref().guard {
+                self.builder.position_at_end(after_pattern_bb);
+                let guard_val = self.eval_expr(guard_expr.as_ref(), ctx)?;
+                let guard_bool = self.to_bool_value(guard_val)?;
+                self.builder
+                    .build_conditional_branch(guard_bool, body_bb, next_check_bb)?;
+            }
 
             self.builder.position_at_end(body_bb);
             let body_val = self.lower_block_expression(&arm.as_ref().body, function, ctx)?;
@@ -1434,7 +1483,34 @@ impl<'ctx> Compiler<'ctx> {
                     _ => bail!("Unsupported binary op for F64"),
                 }
             }
-            _ => bail!("Unsupported type for binary operation"),
+            OtterType::Bool => {
+                let l = lhs_val.into_int_value();
+                let r = rhs_val.into_int_value();
+                match op {
+                    BinaryOp::And => Ok(EvaluatedValue::with_value(
+                        self.builder.build_and(l, r, "and")?.into(),
+                        OtterType::Bool,
+                    )),
+                    BinaryOp::Or => Ok(EvaluatedValue::with_value(
+                        self.builder.build_or(l, r, "or")?.into(),
+                        OtterType::Bool,
+                    )),
+                    BinaryOp::Eq => Ok(EvaluatedValue::with_value(
+                        self.builder
+                            .build_int_compare(IntPredicate::EQ, l, r, "eq")?
+                            .into(),
+                        OtterType::Bool,
+                    )),
+                    BinaryOp::Ne => Ok(EvaluatedValue::with_value(
+                        self.builder
+                            .build_int_compare(IntPredicate::NE, l, r, "ne")?
+                            .into(),
+                        OtterType::Bool,
+                    )),
+                    _ => bail!("Unsupported binary op for Bool: {:?}", op),
+                }
+            }
+            _ => bail!("Unsupported type for binary operation: {:?}", result_ty),
         }
     }
 
@@ -2354,6 +2430,28 @@ impl<'ctx> Compiler<'ctx> {
             elem_val.ty,
             "listcomp_append_call",
         )
+    }
+
+    fn eval_dict_expr(
+        &mut self,
+        elements: &[(Node<Expr>, Node<Expr>)],
+        _type_info: Option<&TypeInfo>,
+        ctx: &mut FunctionContext<'ctx>,
+    ) -> Result<EvaluatedValue<'ctx>> {
+        let map_fn = self.get_or_declare_ffi_function("map.new")?;
+        let map_handle = self
+            .builder
+            .build_call(map_fn, &[], "dict_literal")?
+            .try_as_basic_value()
+            .left()
+            .ok_or_else(|| anyhow!("dict literal creation failed"))?
+            .into_int_value();
+
+        for (key, value) in elements {
+            self.emit_dict_comprehension_insert(map_handle, key.as_ref(), value.as_ref(), ctx)?;
+        }
+
+        Ok(EvaluatedValue::with_value(map_handle.into(), OtterType::Map))
     }
 
     #[expect(

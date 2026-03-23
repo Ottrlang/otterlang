@@ -107,7 +107,7 @@ impl TaskScheduler {
 
     pub fn spawn_fn<F>(&self, name: Option<String>, func: F) -> JoinHandle
     where
-        F: FnOnce() + Send + 'static,
+        F: FnOnce() -> i64 + Send + 'static,
     {
         let task = Task::new(name, Box::new(func) as TaskFn);
         let cancellation_token = task.cancellation_token().clone();

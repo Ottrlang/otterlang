@@ -153,6 +153,15 @@ struct StringIterator {
 static STRING_ITERATORS: Lazy<RwLock<std::collections::HashMap<HandleId, StringIterator>>> =
     Lazy::new(|| RwLock::new(std::collections::HashMap::new()));
 
+struct MapIterator {
+    handle: HandleId,
+    keys: Vec<String>,
+    index: usize,
+}
+
+static MAP_ITERATORS: Lazy<RwLock<std::collections::HashMap<HandleId, MapIterator>>> =
+    Lazy::new(|| RwLock::new(std::collections::HashMap::new()));
+
 fn value_to_string(value: &Value) -> String {
     match value {
         Value::Unit => "None".to_string(),
@@ -1015,6 +1024,60 @@ pub extern "C" fn otter_builtin_iter_next_string(iter_handle: u64) -> u64 {
 #[unsafe(no_mangle)]
 pub extern "C" fn otter_builtin_iter_free_string(iter_handle: u64) {
     STRING_ITERATORS.write().remove(&iter_handle);
+}
+
+// ============================================================================
+// Map Iterator
+// ============================================================================
+
+#[unsafe(no_mangle)]
+pub extern "C" fn otter_builtin_iter_map(handle: u64) -> u64 {
+    let id = next_handle_id();
+    
+    // We snapshot the keys at iteration start
+    let keys = {
+        let maps = MAPS.read();
+        if let Some(map) = maps.get(&handle) {
+            map.items.keys().cloned().collect()
+        } else {
+            Vec::new()
+        }
+    };
+    
+    let iter = MapIterator { handle, keys, index: 0 };
+    MAP_ITERATORS.write().insert(id, iter);
+    id
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn otter_builtin_iter_has_next_map(iter_handle: u64) -> bool {
+    let iterators = MAP_ITERATORS.read();
+    if let Some(iter) = iterators.get(&iter_handle) {
+        iter.index < iter.keys.len()
+    } else {
+        false
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn otter_builtin_iter_next_map(iter_handle: u64) -> u64 {
+    let mut iterators = MAP_ITERATORS.write();
+    if let Some(iter) = iterators.get_mut(&iter_handle) {
+        if iter.index < iter.keys.len() {
+            let key = iter.keys[iter.index].clone();
+            iter.index += 1;
+            encode_runtime_value(&Value::String(key))
+        } else {
+            0
+        }
+    } else {
+        0
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn otter_builtin_iter_free_map(iter_handle: u64) {
+    MAP_ITERATORS.write().remove(&iter_handle);
 }
 
 /// otter-lang's builtin panic function
@@ -2051,6 +2114,31 @@ fn register_builtin_symbols(registry: &SymbolRegistry) {
     registry.register(FfiFunction {
         name: "__otter_iter_free_string".into(),
         symbol: "otter_builtin_iter_free_string".into(),
+        signature: FfiSignature::new(vec![FfiType::Opaque], FfiType::Unit),
+    });
+
+    // Map Iterator functions
+    registry.register(FfiFunction {
+        name: "__otter_iter_map".into(),
+        symbol: "otter_builtin_iter_map".into(),
+        signature: FfiSignature::new(vec![FfiType::Map], FfiType::Opaque),
+    });
+
+    registry.register(FfiFunction {
+        name: "__otter_iter_has_next_map".into(),
+        symbol: "otter_builtin_iter_has_next_map".into(),
+        signature: FfiSignature::new(vec![FfiType::Opaque], FfiType::Bool),
+    });
+
+    registry.register(FfiFunction {
+        name: "__otter_iter_next_map".into(),
+        symbol: "otter_builtin_iter_next_map".into(),
+        signature: FfiSignature::new(vec![FfiType::Opaque], FfiType::Opaque),
+    });
+
+    registry.register(FfiFunction {
+        name: "__otter_iter_free_map".into(),
+        symbol: "otter_builtin_iter_free_map".into(),
         signature: FfiSignature::new(vec![FfiType::Opaque], FfiType::Unit),
     });
 

@@ -1,0 +1,12 @@
+fn test_guards(val: int):
+    match val:
+        case 1 if val > 0:
+            println("one and positive")
+        case 1:
+            println("one")
+        case _:
+            println("other")
+
+fn main():
+    test_guards(1)
+    println("Done")

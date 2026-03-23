@@ -1585,8 +1585,7 @@ impl TypeChecker {
                 let iter_type = self.infer_expr_type(iterable)?;
                 let element_type = match &iter_type {
                     TypeInfo::List(elem) => elem.as_ref().clone(),
-                    TypeInfo::Dict { value, .. } => value.as_ref().clone(),
-                    TypeInfo::Str => TypeInfo::Str,
+                    TypeInfo::Dict { .. } | TypeInfo::Str => TypeInfo::Str, // Map iteration yields keys (strings)
                     TypeInfo::Range(start, end) => {
                         if matches!(start.as_ref(), TypeInfo::I64)
                             || matches!(end.as_ref(), TypeInfo::I64)

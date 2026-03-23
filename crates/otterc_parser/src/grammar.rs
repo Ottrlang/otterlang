@@ -1,3 +1,4 @@
+#![allow(clippy::result_large_err, reason = "Chumsky parser Simple errors are inherently large")]
 use chumsky::Stream;
 use chumsky::prelude::*;
 
@@ -748,6 +749,7 @@ fn expr_parser() -> impl Parser<TokenKind, Node<Expr>, Error = Simple<TokenKind>
 
         let match_case = just(TokenKind::Case)
             .ignore_then(pattern_parser())
+            .then(just(TokenKind::If).ignore_then(logical.clone()).or_not())
             .then_ignore(just(TokenKind::Colon))
             .then_ignore(newline.clone())
             .then(
@@ -758,11 +760,11 @@ fn expr_parser() -> impl Parser<TokenKind, Node<Expr>, Error = Simple<TokenKind>
                     .delimited_by(just(TokenKind::Indent), just(TokenKind::Dedent))
                     .map_with_span(|block, span| Node::new(Block::new(block), span)),
             )
-            .map_with_span(|(pattern, body), span| {
+            .map_with_span(|((pattern, guard), body), span| {
                 Node::new(
                     MatchArm {
                         pattern,
-                        guard: None,
+                        guard,
                         body,
                     },
                     span,

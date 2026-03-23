@@ -407,8 +407,29 @@ impl<'ctx> Compiler<'ctx> {
                     )
                 }
                 OtterType::Map => {
-                    // Map iteration is not yet implemented
-                    bail!("Map iteration is not yet supported")
+                    // Map iteration yields keys (strings)
+                    let iter_create_fn = self.get_or_declare_ffi_function("__otter_iter_map")?;
+                    let iter_has_next_fn =
+                        self.get_or_declare_ffi_function("__otter_iter_has_next_map")?;
+                    let iter_next_fn =
+                        self.get_or_declare_ffi_function("__otter_iter_next_map")?;
+                    let iter_free_fn =
+                        self.get_or_declare_ffi_function("__otter_iter_free_map")?;
+
+                    self.lower_collection_for_loop(
+                        var,
+                        iterable_val,
+                        body,
+                        function,
+                        ctx,
+                        IteratorRuntime {
+                            create_fn: iter_create_fn,
+                            has_next_fn: iter_has_next_fn,
+                            next_fn: iter_next_fn,
+                            free_fn: iter_free_fn,
+                            element_type: OtterType::Str,
+                        },
+                    )
                 }
                 _ => bail!(
                     "For loops over type {:?} are not supported yet",

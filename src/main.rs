@@ -1,3 +1,4 @@
+#![expect(clippy::print_stderr, reason = "CLI output")]
 use otterlang::cli;
 
 fn main() {
@@ -19,7 +20,7 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    #![expect(clippy::panic)]
+    #![expect(clippy::panic, reason = "Tests can panic to fail")]
 
     use clap::Parser;
     use otterlang::cli::{Command, OtterCli};

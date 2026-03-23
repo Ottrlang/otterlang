@@ -1,0 +1,13 @@
+fn main():
+    let map = {"hello": 1, "world": 2}
+    println("Iterating over keys:")
+    let count = 0
+    for key in map:
+        println(key)
+        count = count + 1
+    
+    # We should have seen exactly 2 keys
+    if count == 2:
+        println("Success")
+    else:
+        println(f"Failed: saw {count} keys")

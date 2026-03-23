@@ -20,8 +20,8 @@ use otterc_symbol::registry::{FfiFunction, FfiSignature, FfiType, SymbolRegistry
 
 type HandleId = u64;
 
-type TaskCallback = extern "C" fn();
-type TaskClosure = extern "C" fn(*mut c_void);
+type TaskCallback = extern "C" fn() -> i64;
+type TaskClosure = extern "C" fn(*mut c_void) -> i64;
 
 static TASK_HANDLES: Lazy<Mutex<HashMap<HandleId, JoinHandle>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
@@ -65,8 +65,9 @@ pub extern "C" fn otter_task_spawn(callback: TaskCallback) -> u64 {
     increment_active_tasks();
     let scheduler = runtime().scheduler().clone();
     let join = scheduler.spawn_fn(Some("task.spawn".into()), move || {
-        callback();
+        let res = callback();
         decrement_active_tasks();
+        res
     });
     let task_id = join.task_id().raw();
     TASK_HANDLES.lock().insert(task_id, join);
@@ -80,8 +81,9 @@ pub extern "C" fn otter_task_spawn_closure(callback: TaskClosure, ctx: *mut c_vo
     let mut context_guard = SpawnContextGuard::new(ctx);
     let join = scheduler.spawn_fn(Some("task.spawn".into()), move || {
         let ctx_ptr = context_guard.take();
-        callback(ctx_ptr);
+        let res = callback(ctx_ptr);
         decrement_active_tasks();
+        res
     });
     let task_id = join.task_id().raw();
     TASK_HANDLES.lock().insert(task_id, join);
@@ -89,9 +91,11 @@ pub extern "C" fn otter_task_spawn_closure(callback: TaskClosure, ctx: *mut c_vo
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn otter_task_join(handle: u64) {
+pub extern "C" fn otter_task_join(handle: u64) -> i64 {
     if let Some(join) = TASK_HANDLES.lock().remove(&handle) {
-        join.join();
+        join.join()
+    } else {
+        0
     }
 }
 
@@ -476,7 +480,7 @@ fn register_std_task_symbols(registry: &SymbolRegistry) {
     registry.register(FfiFunction {
         name: "task.join".into(),
         symbol: "otter_task_join".into(),
-        signature: FfiSignature::new(vec![FfiType::Opaque], FfiType::Unit),
+        signature: FfiSignature::new(vec![FfiType::Opaque], FfiType::I64),
     });
 
     registry.register(FfiFunction {

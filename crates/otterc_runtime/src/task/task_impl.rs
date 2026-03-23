@@ -23,7 +23,7 @@ fn next_task_id() -> TaskId {
     TaskId::new(NEXT_TASK_ID.fetch_add(1, Ordering::Relaxed))
 }
 
-pub type TaskFn = Box<dyn FnOnce() + Send + 'static>;
+pub type TaskFn = Box<dyn FnOnce() -> i64 + Send + 'static>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TaskState {
@@ -72,6 +72,7 @@ pub struct JoinState {
 #[derive(Debug)]
 struct JoinInner {
     completed: bool,
+    result: Option<i64>,
     waiters: Vec<Waker>,
 }
 
@@ -80,18 +81,20 @@ impl JoinState {
         Arc::new(Self {
             inner: Mutex::new(JoinInner {
                 completed: false,
+                result: None,
                 waiters: Vec::new(),
             }),
             condvar: Condvar::new(),
         })
     }
 
-    pub fn mark_complete(&self) {
+    pub fn mark_complete(&self, result: Option<i64>) {
         let mut inner = self.inner.lock();
         if inner.completed {
             return;
         }
         inner.completed = true;
+        inner.result = result;
         for waker in inner.waiters.drain(..) {
             waker.wake();
         }
@@ -102,11 +105,12 @@ impl JoinState {
         self.inner.lock().completed
     }
 
-    pub fn wait_blocking(&self) {
+    pub fn wait_blocking(&self) -> i64 {
         let mut inner = self.inner.lock();
         while !inner.completed {
             self.condvar.wait(&mut inner);
         }
+        inner.result.unwrap_or(0)
     }
 
     pub fn register_waker(&self, waker: &Waker) -> bool {
@@ -177,7 +181,7 @@ impl Task {
         // Check if cancelled before running
         if self.cancellation_token.is_cancelled() {
             self.state = TaskState::Cancelled;
-            self.join.mark_complete();
+            self.join.mark_complete(None);
             return;
         }
 
@@ -185,8 +189,9 @@ impl Task {
 
         // Run the function, but check for cancellation periodically
         // Note: For cooperative cancellation, tasks should check cancellation_token themselves
+        let mut result = None;
         if let Some(func) = self.func.take() {
-            func();
+            result = Some(func());
         }
 
         // Check if cancelled after running
@@ -195,7 +200,7 @@ impl Task {
         } else {
             self.state = TaskState::Completed;
         }
-        self.join.mark_complete();
+        self.join.mark_complete(result);
     }
 }
 
@@ -226,8 +231,8 @@ impl JoinHandle {
         self.state.is_complete()
     }
 
-    pub fn join(&self) {
-        self.state.wait_blocking();
+    pub fn join(&self) -> i64 {
+        self.state.wait_blocking()
     }
 
     pub fn cancel(&self) {

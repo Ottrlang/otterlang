@@ -175,7 +175,7 @@ impl MemoryProfiler {
             size_histogram,
             top_allocators: {
                 let mut v: Vec<_> = function_allocations.into_iter().collect();
-                v.sort_by(|a, b| b.1.0.cmp(&a.1.0));
+                v.sort_by_key(|a| std::cmp::Reverse(a.1.0));
                 v.into_iter().take(10).collect()
             },
         }
@@ -198,7 +198,7 @@ impl MemoryProfiler {
             });
         }
 
-        leaks.sort_by(|a, b| b.size.cmp(&a.size));
+        leaks.sort_by_key(|a| std::cmp::Reverse(a.size));
         leaks
     }
 }

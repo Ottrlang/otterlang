@@ -1,0 +1,20 @@
+use task
+
+fn async_computation(x: int) -> int:
+    task.sleep(100)
+    return x * 2
+
+fn test_await_return_values():
+    let task1 = spawn async_computation(5)
+    let task2 = spawn async_computation(10)
+    
+    let result1 = await task1
+    let result2 = await task2
+    
+    if result1 == 10 and result2 == 20:
+        println("Success")
+    else:
+        println(f"Failed: {result1}, {result2}")
+
+fn main():
+    test_await_return_values()
