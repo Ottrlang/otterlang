@@ -66,7 +66,7 @@ impl Formatter {
                 then_block,
                 elif_blocks,
                 else_block,
-            } => self.format_if(cond, then_block, elif_blocks, else_block, indent),
+            } => self.format_if(cond, then_block, elif_blocks, else_block.as_ref(), indent),
             Statement::For {
                 var,
                 iterable,
@@ -288,7 +288,7 @@ impl Formatter {
         cond: &Node<Expr>,
         then_block: &Node<Block>,
         elif_blocks: &[(Node<Expr>, Node<Block>)],
-        else_block: &Option<Node<Block>>,
+        else_block: Option<&Node<Block>>,
         indent: usize,
     ) -> String {
         let mut result = format!(
