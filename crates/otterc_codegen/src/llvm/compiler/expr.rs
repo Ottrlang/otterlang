@@ -3094,7 +3094,7 @@ impl<'ctx> Compiler<'ctx> {
             .left()
             .ok_or_else(|| anyhow!("runtime.enum.create returned void"))?;
 
-        for (index, (field_type, value)) in field_types.iter().zip(values.into_iter()).enumerate() {
+        for (index, (field_type, value)) in field_types.iter().zip(values).enumerate() {
             self.store_enum_field(handle, index as u32, field_type, value)?;
         }
 
